@@ -2,6 +2,8 @@
 {
     public class ThreadedQueueProcessorParameters
     {
+        public int QueueCapacity = 30_000;
+
         public int BoostBarrier = 100;
         public int BoostCooldownTicks = 10;
         public int ClientsPerThread = 100;

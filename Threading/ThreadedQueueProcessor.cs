@@ -12,6 +12,7 @@ namespace Ace.Networking.Threading
         private static Timer _timer;
         private static volatile bool _killing;
         private static readonly ManualResetEvent KillingHandle = new ManualResetEvent(true);
+        private readonly ManualResetEvent _enqueueHandle = new ManualResetEvent(true);
 
         private readonly object _threadLock = new object();
 
@@ -104,13 +105,13 @@ namespace Ace.Networking.Threading
 
         private void Monitor(object state)
         {
-            //Console.Title = $"{ThreadCount}";
+            //Console.Title = $"{Pending}";
             var currentThreadCount = ThreadCount;
             var threadsRequired = Math.Max(GetMinClientThreadCount(), Parameters.MinThreads);
             var clients = ClientCount;
             var target = currentThreadCount;
 
-            var cc = Pending;
+            var cc = _pending;
 
             if (cc >= BoostPeak + Parameters.BoostBarrier &&
                 MonitorTick - LastBoostTick >= Parameters.BoostCooldownTicks)
@@ -152,7 +153,7 @@ namespace Ace.Networking.Threading
 
                         lock (_threadLock)
                         {
-                            for (var i = 0; i < currentThreadCount; i++)
+                            for (var i = threadsRequired; i < currentThreadCount; i++)
                             {
                                 var delta = ThreadList[i].WorkTicksDelta;
                                 if (MonitorTick - ThreadList[i].StartTick <= Parameters.ThreadStartProtectionTicks)
@@ -181,6 +182,7 @@ namespace Ace.Networking.Threading
                             if (!killed && leastWorkId != -1 && MonitorTick - LastBoostTick >= Parameters.StepdownDelay
                                 && MonitorTick - LastStepdownTick >= Parameters.StepdownCooldownTicks)
                             {
+                                LastKillTick = MonitorTick;
                                 LastStepdownTick = MonitorTick;
                                 KillThread(leastWorkId, currentThreadCount);
                                 currentThreadCount--;
@@ -243,7 +245,7 @@ namespace Ace.Networking.Threading
             var tick = MonitorTick;
             for (var i = 0; i < count; i++)
             {
-                var t = new Thread(Work);
+                var t = ThreadCount == 0 ? new Thread(WorkMain) : new Thread(Work);
                 var data = new ThreadData
                 {
                     Thread = t,
@@ -264,6 +266,10 @@ namespace Ace.Networking.Threading
             {
                 KillingHandle.WaitOne();
             }
+            if (_pending > Parameters.QueueCapacity)
+            {
+                _enqueueHandle.WaitOne();
+            }
 
             var i = discriminator % ThreadCount;
             SendQueues[i].Enqueue(item);
@@ -271,8 +277,73 @@ namespace Ace.Networking.Threading
             ThreadList[i].WaitHandle.Set();
         }
 
+        private void WorkMain(object state)
+        {
+            //Console.WriteLine("Main thread started");
+            var data = (ThreadData) state;
+            var q = SendQueues[data.Id];
+            var handle = data.WaitHandle;
+            var barrier = Parameters.QueueCapacity;
+            var cState = true;
+            while (data.Run)
+            {
+                if (q.TryDequeue(out var item))
+                {
+                    try
+                    {
+                        Worker.DoWork(item);
+                    }
+                    catch
+                    {
+                    }
+                    if (Interlocked.Decrement(ref _pending) <= barrier)
+                    {
+                        if (!cState)
+                        {
+                            _enqueueHandle.Set();
+                            cState = true;
+                        }
+                    }
+                    else
+                    {
+                        if (cState)
+                        {
+                            _enqueueHandle.Reset();
+                            cState = false;
+                        }
+                    }
+                    Interlocked.Increment(ref data.WorkTicks);
+                    data.LastWorkTick = MonitorTick;
+                }
+                else
+                {
+                    while (!handle.WaitOne(5))
+                    {
+                        if (_pending <= barrier)
+                        {
+                            if (!cState)
+                            {
+                                _enqueueHandle.Set();
+                                cState = true;
+                            }
+                        }
+                        else
+                        {
+                            if (cState)
+                            {
+                                _enqueueHandle.Reset();
+                                cState = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+
         private void Work(object state)
         {
+            //Console.WriteLine($"Thread {Thread.CurrentThread.ManagedThreadId} started");
             var data = (ThreadData) state;
             var q = SendQueues[data.Id];
             var handle = data.WaitHandle;
@@ -289,13 +360,14 @@ namespace Ace.Networking.Threading
                     }
                     Interlocked.Decrement(ref _pending);
                     Interlocked.Increment(ref data.WorkTicks);
-                    data.LastWorkTick = Interlocked.Increment(ref MonitorTick);
+                    data.LastWorkTick = MonitorTick;
                 }
                 else
                 {
-                    handle.WaitOne();
+                    handle.WaitOne(5);
                 }
             }
+            //Console.WriteLine($"Thread {Thread.CurrentThread.ManagedThreadId} killed");
         }
     }
 }

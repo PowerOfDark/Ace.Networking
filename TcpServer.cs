@@ -94,7 +94,7 @@ namespace Ace.Networking
 
         private void Timer_Tick(object state)
         {
-            if (!ReceiveTimeout.HasValue)
+            if (!ReceiveTimeout.HasValue || !_receiveTimeoutCheck.HasValue)
             {
                 return;
             }
@@ -114,15 +114,9 @@ namespace Ace.Networking
                      * but it's handled by ConcurrentDictionary */
                     continue;
                 }
-                if (connection.Value.LastReceived.HasValue)
+                if (now.Subtract(connection.Value.LastReceived) >= ReceiveTimeout.Value)
                 {
-                    if (now.Subtract(connection.Value.LastReceived.Value) >= ReceiveTimeout.Value)
-                    {
-                        if (Timeout != null)
-                        {
-                            Timeout?.Invoke(connection.Value);
-                        }
-                    }
+                    Timeout?.Invoke(connection.Value);
                 }
             }
 

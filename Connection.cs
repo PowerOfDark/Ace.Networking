@@ -1,4 +1,5 @@
-﻿using System;
+﻿#define ReadAsync_Test
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -153,7 +154,7 @@ namespace Ace.Networking
         /// <summary>
         ///     Gets the <code>DateTime</code> of the last received packet.
         /// </summary>
-        public DateTime? LastReceived { get; internal set; }
+        public DateTime LastReceived { get; internal set; }
 
         public event DisconnectHandler Disconnected;
 
@@ -214,8 +215,12 @@ namespace Ace.Networking
             if (!_receiveWorkerThreadRunning)
             {
                 _receiveWorkerThreadRunning = true;
+#if ReadAsync_Test
+                ReadAsync().ConfigureAwait(false);
+#else
                 _receiveWorkerThread = new Thread(ReadSync) {IsBackground = false};
                 _receiveWorkerThread.Start();
+#endif
             }
         }
 
@@ -466,17 +471,67 @@ namespace Ace.Networking
             _receiveLock.Release();
         }
 
+        private async Task ReadAsync()
+        {
+            await _receiveLock.WaitAsync();
+            while (_receiveWorkerThreadRunning)
+            {
+                try
+                {
+                    var read = await Stream.ReadAsync(_readBuffer.Buffer, _readBuffer.Offset, _readBuffer.Capacity).ConfigureAwait(false);
+
+                    if (read == 0)
+                    {
+                        try
+                        {
+                            //_socket.Dispose();
+                            Close();
+                            //Close();
+                        }
+                        catch
+                        {
+                        }
+                        goto CLEANUP;
+                    }
+
+                    LastReceived = DateTime.Now;
+                    _readBuffer.BytesTransferred = read;
+                    _readBuffer.Offset = _readBuffer.BaseOffset;
+                    _readBuffer.Count = read;
+
+                    try
+                    {
+                        if (_readBuffer.Count > 0)
+                        {
+                            _decoder.ProcessReadBytes(_readBuffer);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        HandleRemoteDisconnect(SocketError.SocketError, exception);
+                    }
+                }
+                catch (Exception e)
+                {
+                    HandleRemoteDisconnect(SocketError.SocketError, e);
+                }
+            }
+            CLEANUP:
+            ;
+            _receiveLock.Release();
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SendSync(IPreparedPacket msg)
         {
-            if (Socket == null || !Socket.Connected)
+            if (Socket == null || !Connected)
             {
                 throw new SocketException((int) SocketError.NotInitialized);
             }
 
             _payloadPending = msg;
             _payloadPendingType = msg.GetType();
-            _sendLock.Wait();
+            //_sendLock.Wait();
             _encoder.Prepare(msg);
             var isComplete = false;
             var err = false;
@@ -499,7 +554,7 @@ namespace Ace.Networking
 
             if (!err)
             {
-                _sendLock.Release();
+                //_sendLock.Release();
                 _sendCompletionSource?.TrySetResult(_payloadPending);
                 PayloadSent?.Invoke(this, _payloadPending, _payloadPendingType);
             }
@@ -761,7 +816,6 @@ namespace Ace.Networking
         public async Task<T> Receive<T>(TimeSpan? timeout = null)
         {
             var tcs = new TaskCompletionSource<object>();
-
             if (!_receiveTypeFilters.TryAddLast(typeof(T), tcs))
             {
                 throw new InvalidOperationException();
@@ -774,7 +828,6 @@ namespace Ace.Networking
             }
             return (T) await tcs.Task;
         }
-
 
         public Task<object> SendReceive<TSend>(TSend obj, PayloadFilter filter, TimeSpan? timeout = null)
         {

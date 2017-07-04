@@ -80,29 +80,26 @@ namespace Ace.Networking.Handlers
         protected void ProcessPayloadHandlers(Connection connection, object obj, Type type,
             Action<object> responseSender = null)
         {
-            if (TypeHandlers.Count > 0)
+            if (TypeHandlers.TryGetValue(type, out var list))
             {
-                if (TypeHandlers.ContainsKey(type))
+                lock (list)
                 {
-                    lock (TypeHandlers[type])
+                    try
                     {
-                        try
+                        foreach (var f in list)
                         {
-                            foreach (var f in TypeHandlers[type])
+                            var r = f.Invoke(connection, obj, type);
+                            if (r != null)
                             {
-                                var r = f.Invoke(connection, obj, type);
-                                if (r != null)
-                                {
-                                    responseSender?.Invoke(r);
-                                }
+                                responseSender?.Invoke(r);
                             }
                         }
-                        catch
-                        {
-                        }
-                        //TODO: Inconsistencies
-                        // An exception in one of the handlers breaks the chain
                     }
+                    catch
+                    {
+                    }
+                    //TODO: Inconsistencies
+                    // An exception in one of the handlers breaks the chain
                 }
             }
         }

@@ -6,14 +6,7 @@ namespace Ace.Networking.Threading
     {
         public void DoWork(ReceiveMessageQueueItem item)
         {
-            try
-            {
-                item.PayloadReceived(item.Header, item.Payload, item.Type);
-            }
-            catch
-            {
-                // ignored
-            }
+            item.PayloadReceived(item.Header, item.Payload, item.Type);
         }
     }
 }
