@@ -263,7 +263,7 @@ namespace Ace.Networking.Threading
                 _enqueueHandle.WaitOne();
             }
 
-            var i = discriminator % ThreadCount;
+            var i = Math.Abs(discriminator % ThreadCount);
             SendQueues[i].Enqueue(item);
             Interlocked.Increment(ref _pending);
             ThreadList[i].WaitHandle.Set();
