@@ -50,7 +50,7 @@ namespace Ace.Networking
         private readonly SemaphoreSlim _receiveLock = new SemaphoreSlim(1, 1);
 
         /// <summary>
-        ///     where object is TaskCompletionSource<T>; can't avoid boxing/unboxing
+        ///     where object is TaskCompletionSource of T; can't avoid boxing/unboxing
         /// </summary>
         private readonly ConcurrentDictionary<Type, LinkedList<TaskCompletionSource<object>>> _receiveTypeFilters =
             new ConcurrentDictionary<Type, LinkedList<TaskCompletionSource<object>>>();
@@ -110,7 +110,7 @@ namespace Ace.Networking
         public Connection(TcpClient client, ProtocolConfiguration configuration) : this(client,
             configuration.PayloadEncoder.Clone(), configuration.PayloadDecoder.Clone())
         {
-            UseSsl = configuration.UseSsl;
+            SslMode = configuration.SslMode;
             CustomOutcomingMessageQueue = configuration.CustomOutcomingMessageQueue;
             CustomIncomingMessageQueue = configuration.CustomIncomingMessageQueue;
         }
@@ -133,8 +133,8 @@ namespace Ace.Networking
         public TcpClient Client { get; private set; }
         public bool Connected { get; private set; }
         public Socket Socket => Client?.Client;
-        public Stream Stream => UseSsl ? _sslStream : _stream;
-        public bool UseSsl { get; }
+        public Stream Stream => _sslStream ?? _stream;
+        public SslMode SslMode { get; }
 
         public int MessagesQueued
         {
@@ -189,19 +189,24 @@ namespace Ace.Networking
                 return;
             }
             _stream = new NetworkStream(Socket);
-            if (UseSsl)
+            if (SslMode != SslMode.None)
             {
                 _sslStream = _sslFactory.Build(this);
+                if (SslMode == SslMode.AuthorizationOnly)
+                {
+                    _sslStream?.Dispose();
+                    _sslStream = null;
+                }
             }
             Connected = true;
             if (UseCustomIncomingMessageQueue)
             {
                 _decoder.PacketReceived = DispatchPayloadReceived;
-                CustomIncomingMessageQueue.Assign(this);
+                CustomIncomingMessageQueue.NewClient();
             }
             if (UseCustomOutcomingMessageQueue)
             {
-                CustomOutcomingMessageQueue.Assign(this);
+                CustomOutcomingMessageQueue.NewClient();
             }
             else
             {
@@ -229,6 +234,19 @@ namespace Ace.Networking
         {
             CustomIncomingMessageQueue.Enqueue(new ReceiveMessageQueueItem(OnPayloadReceived, header, obj, type),
                 (int) Identifier);
+        }
+
+        private void OnDisconnected()
+        {
+            // top-level logic to run after the connection is closed
+            if (UseCustomIncomingMessageQueue)
+            {
+                CustomIncomingMessageQueue.RemoveClient();
+            }
+            if (UseCustomOutcomingMessageQueue)
+            {
+                CustomOutcomingMessageQueue.RemoveClient();
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -319,6 +337,7 @@ namespace Ace.Networking
                             }
                             catch
                             {
+                                // ignored
                             }
                         }
                         var next = enumerator.Next;
@@ -339,6 +358,7 @@ namespace Ace.Networking
             }
             catch
             {
+                // ignored
             }
 
             try
@@ -347,6 +367,7 @@ namespace Ace.Networking
             }
             catch
             {
+                // ignored
             }
 
             //TODO: Inconsistencies
@@ -440,6 +461,7 @@ namespace Ace.Networking
                         }
                         catch
                         {
+                            // ignored
                         }
                         goto CLEANUP;
                     }
@@ -467,7 +489,7 @@ namespace Ace.Networking
                 }
             }
             CLEANUP:
-            ;
+
             _receiveLock.Release();
         }
 
@@ -490,6 +512,7 @@ namespace Ace.Networking
                         }
                         catch
                         {
+                            // ignored
                         }
                         goto CLEANUP;
                     }
@@ -517,7 +540,7 @@ namespace Ace.Networking
                 }
             }
             CLEANUP:
-            ;
+
             _receiveLock.Release();
         }
 
@@ -533,7 +556,7 @@ namespace Ace.Networking
             _payloadPendingType = msg.GetType();
             //_sendLock.Wait();
             _encoder.Prepare(msg);
-            var isComplete = false;
+            bool isComplete;
             var err = false;
             do
             {
@@ -660,6 +683,7 @@ namespace Ace.Networking
             }
             catch
             {
+                // ignored
             }
 
             HandleRemoteDisconnect(SocketError.Shutdown, new SocketException((int) SocketError.Shutdown));
@@ -683,12 +707,14 @@ namespace Ace.Networking
             }
             catch
             {
+                // ignored
             }
 
             _receiveWorkerThreadRunning = _sendWorkerThreadRunning = false;
 
             ClearHandlers(exception);
             _sendWorkerWaitHandle?.Set();
+            OnDisconnected();
             Disconnected?.Invoke(this, exception);
 
             Cleanup();

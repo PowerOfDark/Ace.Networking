@@ -9,17 +9,17 @@ namespace Ace.Networking.Threading
 {
     public class ThreadedQueueProcessor<TItem>
     {
-        private static Timer _timer;
-        private static volatile bool _killing;
-        private static readonly ManualResetEvent KillingHandle = new ManualResetEvent(true);
         private readonly ManualResetEvent _enqueueHandle = new ManualResetEvent(true);
+        private readonly ManualResetEvent _killingHandle = new ManualResetEvent(true);
 
         private readonly object _threadLock = new object();
 
         protected readonly ThreadedQueueProcessorParameters Parameters;
 
         public readonly List<ThreadData> ThreadList;
+        private volatile bool _killing;
         private int _pending;
+        private Timer _timer;
         protected int BoostPeak;
         protected volatile int ClientCount;
         protected long LastBoostTick;
@@ -80,21 +80,13 @@ namespace Ace.Networking.Threading
             SpawnNewThreads(Parameters.MinThreads);
         }
 
-        public void Assign(Connection connection)
+        public void NewClient()
         {
             if (_timer == null)
             {
                 Initialize();
             }
             Interlocked.Increment(ref ClientCount);
-            if (!connection.Connected)
-            {
-                Connection_Disconnected(connection, new Exception());
-            }
-            else
-            {
-                connection.Disconnected += Connection_Disconnected;
-            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -212,7 +204,7 @@ namespace Ace.Networking.Threading
 
         private void KillThread(int id, int count)
         {
-            KillingHandle.Reset();
+            _killingHandle.Reset();
             _killing = true;
             ThreadList[id].Run = false;
             ThreadList[id].WaitHandle.Set();
@@ -222,11 +214,11 @@ namespace Ace.Networking.Threading
             Interlocked.Decrement(ref ThreadCount);
             ThreadList[count - 1] = null;
             _killing = false;
-            KillingHandle.Set();
+            _killingHandle.Set();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Connection_Disconnected(Connection connection, Exception exception)
+        public void RemoveClient()
         {
             Interlocked.Decrement(ref ClientCount);
         }
@@ -251,7 +243,7 @@ namespace Ace.Networking.Threading
                     Thread = t,
                     WaitHandle = new AutoResetEvent(false),
                     Id = ThreadCount,
-                    StartTick = MonitorTick
+                    StartTick = tick
                 };
                 ThreadList[data.Id] = data;
                 t.Start(data);
@@ -264,7 +256,7 @@ namespace Ace.Networking.Threading
         {
             if (_killing)
             {
-                KillingHandle.WaitOne();
+                _killingHandle.WaitOne();
             }
             if (_pending > Parameters.QueueCapacity)
             {
@@ -295,6 +287,7 @@ namespace Ace.Networking.Threading
                     }
                     catch
                     {
+                        // ignored
                     }
                     if (Interlocked.Decrement(ref _pending) <= barrier)
                     {
@@ -357,6 +350,7 @@ namespace Ace.Networking.Threading
                     }
                     catch
                     {
+                        // ignored
                     }
                     Interlocked.Decrement(ref _pending);
                     Interlocked.Increment(ref data.WorkTicks);

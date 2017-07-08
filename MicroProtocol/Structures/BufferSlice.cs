@@ -17,11 +17,11 @@ namespace Ace.Networking.MicroProtocol.Structures
         {
             if (buffer == null)
             {
-                throw new ArgumentNullException("buffer");
+                throw new ArgumentNullException(nameof(buffer));
             }
             if (offset + count > buffer.Length)
             {
-                throw new ArgumentOutOfRangeException("offset", offset,
+                throw new ArgumentOutOfRangeException(nameof(offset), offset,
                     "Offset+Count must be less than the buffer length.");
             }
 

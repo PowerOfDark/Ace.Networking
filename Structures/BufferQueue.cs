@@ -6,14 +6,15 @@ namespace Ace.Networking.Structures
     public class BufferQueue<T>
     {
         private readonly ConcurrentQueue<T> _container;
+
         private readonly AutoResetEvent _lock;
-        private object _enqueueSyncRoot;
+        //private object _enqueueSyncRoot;
 
         private BufferQueue()
         {
             _container = new ConcurrentQueue<T>();
             _lock = new AutoResetEvent(false);
-            _enqueueSyncRoot = new object();
+            //_enqueueSyncRoot = new object();
         }
 
         public BufferQueue(int barrier) : this()

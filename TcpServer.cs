@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Ace.Networking.Handlers;
 using Ace.Networking.MicroProtocol.Interfaces;
+using Ace.Networking.MicroProtocol.SSL;
 using static Ace.Networking.Connection;
 
 namespace Ace.Networking
@@ -74,7 +75,7 @@ namespace Ace.Networking
         }
 
 
-        public bool UseSsl => Configuration?.UseSsl ?? false;
+        public SslMode SslMode => Configuration.SslMode;
 
         public IPEndPoint Endpoint { get; protected set; }
         public ConcurrentDictionary<long, Connection> Connections { get; }
@@ -109,6 +110,7 @@ namespace Ace.Networking
                     }
                     catch
                     {
+                        // ignored
                     }
                     /* Removing values while iterating is unsafe,
                      * but it's handled by ConcurrentDictionary */
@@ -127,15 +129,15 @@ namespace Ace.Networking
         {
             if (Endpoint == null)
             {
-                throw new ArgumentNullException("Invalid endpoint");
+                throw new InvalidOperationException("Invalid endpoint");
             }
             if (_listener != null)
             {
                 throw new InvalidOperationException("Already listening");
             }
-            if (UseSsl && SslFactory == null)
+            if (SslMode != SslMode.None && SslFactory == null)
             {
-                throw new ArgumentNullException("Missing SSL certificate");
+                throw new SslException("Missing SSL certificate", null);
             }
 
             _shuttingDown = false;
@@ -163,6 +165,7 @@ namespace Ace.Networking
                 }
                 catch
                 {
+                    // ignored
                 }
             }
             Connections.Clear();
@@ -188,6 +191,7 @@ namespace Ace.Networking
                 }
                 catch
                 {
+                    // ignored
                 }
             }
         }
@@ -222,11 +226,6 @@ namespace Ace.Networking
             OnClientAccepted(con);
         }
 
-        private void Con_Timeout(Connection connection)
-        {
-            Timeout?.Invoke(connection);
-        }
-
         private void OnClientAccepted(Connection connection)
         {
             ClientAccepted?.Invoke(connection);
@@ -240,6 +239,7 @@ namespace Ace.Networking
             }
             catch
             {
+                // ignored
             }
             Connections.TryRemove(connection.Identifier, out _);
         }
@@ -254,6 +254,7 @@ namespace Ace.Networking
             }
             catch
             {
+                // ignored
             }
             //TODO: Inconsistencies
         }

@@ -36,7 +36,7 @@ namespace Ace.Networking.MicroProtocol.Headers
         public static BasicHeader Upgrade(byte[] target, int offset = 0)
         {
             var type = (PacketType) target[offset];
-            BasicHeader upgraded = null;
+            BasicHeader upgraded;
             switch (type)
             {
                 case PacketType.ContentPacket:

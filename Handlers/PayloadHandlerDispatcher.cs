@@ -97,6 +97,7 @@ namespace Ace.Networking.Handlers
                     }
                     catch
                     {
+                        // ignored
                     }
                     //TODO: Inconsistencies
                     // An exception in one of the handlers breaks the chain

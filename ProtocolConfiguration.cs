@@ -7,8 +7,6 @@ namespace Ace.Networking
 {
     public abstract class ProtocolConfiguration
     {
-        private bool _useSsl;
-
         protected volatile bool IsInitialized;
 
         public ProtocolConfiguration(IPayloadEncoder encoder, IPayloadDecoder decoder,
@@ -29,11 +27,7 @@ namespace Ace.Networking
         public IPayloadEncoder PayloadEncoder { get; protected set; }
         public IPayloadDecoder PayloadDecoder { get; protected set; }
 
-        public bool UseSsl
-        {
-            get => _useSsl || RequireClientCertificate;
-            set => _useSsl = value;
-        }
+        public SslMode SslMode { get; set; }
 
         public bool RequireClientCertificate { get; protected set; }
         public ThreadedQueueProcessor<SendMessageQueueItem> CustomOutcomingMessageQueue { get; protected set; }

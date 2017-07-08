@@ -199,7 +199,7 @@ namespace Ace.Networking.MicroProtocol
                 return false;
             }
             SKIP_CHECKS:
-            ;
+
             _bytesLeftForCurrentState = sizeof(short);
             _headerOffset = 0;
             _stateMethod = ReadHeaderLength;

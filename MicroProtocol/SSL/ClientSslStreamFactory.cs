@@ -47,8 +47,6 @@ namespace Ace.Networking.MicroProtocol.SSL
         /// <summary>
         ///     Build a new SSL steam.
         /// </summary>
-        /// <param name="channel">Channel which will use the stream</param>
-        /// <param name="socket">Socket to wrap</param>
         /// <returns>Stream which is ready to be used (must have been validated)</returns>
         public SslStream Build(Connection connection)
         {
