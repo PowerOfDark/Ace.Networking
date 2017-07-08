@@ -55,7 +55,7 @@ namespace Ace.Networking
         public AcceptClientFilter AcceptClient { get; set; } = client => true;
 
         /// <summary>
-        ///     Specifies the TimeSpan for triggering <see cref="Timeout" />
+        ///     Specifies the TimeSpan for triggering <see cref="IdleTimeout" />
         /// </summary>
         /// <remarks>
         ///     Each connection will be checked for the timeout twice in the specified TimeSpan
@@ -91,7 +91,9 @@ namespace Ace.Networking
         /// <remarks>
         ///     <para>This handler is triggered synchronously in a Timer.</para>
         /// </remarks>
-        public event ReceiveTimeoutHandler Timeout;
+        public event ReceiveTimeoutHandler IdleTimeout;
+
+        public event Action Timeout;
 
         private void Timer_Tick(object state)
         {
@@ -118,9 +120,11 @@ namespace Ace.Networking
                 }
                 if (now.Subtract(connection.Value.LastReceived) >= ReceiveTimeout.Value)
                 {
-                    Timeout?.Invoke(connection.Value);
+                    IdleTimeout?.Invoke(connection.Value);
                 }
             }
+
+            Timeout?.Invoke();
 
             _timer.Change((int) _receiveTimeoutCheck.Value.TotalMilliseconds, System.Threading.Timeout.Infinite);
         }
