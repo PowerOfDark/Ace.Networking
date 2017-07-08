@@ -8,7 +8,7 @@ namespace Ace.Networking.MicroProtocol.PacketTypes
         internal RawDataPacket(RawDataHeader header, byte[] rawData, int len = -1) : this(header,
             new MemoryStream(rawData))
         {
-            (Payload as MemoryStream)?.SetLength(len >= 0 ? len : rawData.Length);
+            (Payload as MemoryStream)?.SetLength(len > 0 ? len : rawData.Length);
         }
 
         internal RawDataPacket(RawDataHeader header, Stream stream) : base(header, stream)

@@ -29,6 +29,7 @@ namespace Ace.Networking.MicroProtocol
         private bool _headerIsSent;
         private int _headerSize;
         private object _message;
+        private bool _disposeBodyStream = true;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="MicroMessageEncoder" /> class.
@@ -120,11 +121,12 @@ namespace Ace.Networking.MicroProtocol
             if (!_headerIsSent)
             {
                 var headerLength = CreateHeader();
-                var bytesToWrite = (int) Math.Min(_bufferSlice.Capacity - headerLength, _bodyStream.Length);
+                int streamLen = (int)(_bodyStream.Length - _bodyStream.Position);
+                var bytesToWrite = (int) Math.Min(_bufferSlice.Capacity - headerLength, streamLen);
                 _bodyStream.Read(_bufferSlice.Buffer, _bufferSlice.Offset + headerLength, bytesToWrite);
                 args.SetBuffer(_bufferSlice.Buffer, _bufferSlice.Offset, bytesToWrite + headerLength);
                 _bytesEnqueued = headerLength + bytesToWrite;
-                _bytesLeftToSend = headerLength + (int) _bodyStream.Length;
+                _bytesLeftToSend = headerLength + streamLen;
             }
             else
             {
@@ -174,7 +176,7 @@ namespace Ace.Networking.MicroProtocol
             _bytesTransferred = 0;
             _bytesLeftToSend = 0;
 
-            if (!ReferenceEquals(_bodyStream, _internalStream))
+            if (!ReferenceEquals(_bodyStream, _internalStream) && _disposeBodyStream)
             {
                 //bodyStream is null for channels that connected
                 //but never sent a message.
@@ -186,10 +188,12 @@ namespace Ace.Networking.MicroProtocol
             {
                 _internalStream.SetLength(0);
             }
+            _bodyStream = _internalStream;
 
             _headerIsSent = false;
             _headerSize = 0;
             _message = null;
+            _disposeBodyStream = true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -212,6 +216,7 @@ namespace Ace.Networking.MicroProtocol
                     _bodyStream = new MemoryStream(buf);
                     _bodyStream.SetLength(buf.Length);
                     content.ContentType = _serializer.CreateContentType(typeof(byte[]));
+                    _disposeBodyStream = true;
                 }
                 else
                 {
@@ -229,7 +234,8 @@ namespace Ace.Networking.MicroProtocol
                     }
                     content.ContentType = contentType;
                 }
-                content.ContentLength = (int) _bodyStream.Length;
+                content.ContentLength = (int) (_bodyStream.Length - _bodyStream.Position);
+                //_bodyStream.Position = 0;
                 if (content.ContentLength == 0)
                 {
                     content.PacketFlag |= PacketFlag.NoContent;
@@ -237,14 +243,14 @@ namespace Ace.Networking.MicroProtocol
             }
             else if (_header is RawDataHeader raw)
             {
-                _bodyStream = (MemoryStream) _message;
-                if (raw.ContentLength == 0)
+                _bodyStream = (Stream) _message;
+                if (raw.ContentLength <= 0)
                 {
-                    raw.ContentLength = (int) _bodyStream.Length;
+                    raw.ContentLength = (int) (_bodyStream.Length-_bodyStream.Position);
                 }
+                _disposeBodyStream = raw.DisposeStreamAfterSend;
             }
 
-            _bodyStream.Position = 0;
             var sliceOffset = _bufferSlice.Offset;
             var sliceBuffer = _bufferSlice.Buffer;
             _headerSize = 1 + 2; //

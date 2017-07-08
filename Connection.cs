@@ -662,16 +662,20 @@ namespace Ace.Networking
             return EnqueueSendRaw(bufId, 0, buf, count);
         }
 
+        /// <summary>
+        ///     WARNING: This function uses the specified Stream to stream data.
+        ///     If <paramref name="disposeAfterSend" /> is true, the Stream will be disposed after the send operation is completed.
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task EnqueueSendRaw(int bufId, int seq, Stream stream)
+        public Task EnqueueSendRaw(int bufferId, int seq, Stream stream, int count = -1, bool disposeAfterSend = true)
         {
-            return EnqueueSendPacket(new RawDataPacket(new RawDataHeader(bufId, seq), stream));
+            return EnqueueSendPacket(new RawDataPacket(new RawDataHeader(bufferId, seq, count, disposeAfterSend), stream));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task EnqueueSendRaw(int bufId, Stream stream)
+        public Task EnqueueSendRaw(int bufferId, Stream stream, int count = -1, bool disposeAfterSend = true)
         {
-            return EnqueueSendRaw(bufId, 0, stream);
+            return EnqueueSendRaw(bufferId, 0, stream, count, disposeAfterSend);
         }
 
 
