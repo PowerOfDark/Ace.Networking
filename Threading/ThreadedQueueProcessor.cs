@@ -75,8 +75,14 @@ namespace Ace.Networking.Threading
                 SendQueues[i] = new ConcurrentQueue<ThreadedQueueItem<TItem>>();
                 ThreadList.Add(null);
             }
-
-            _timer = new Timer(Monitor, null, 1000, Timeout.Infinite);
+            if (Parameters.MaxThreads == Parameters.MinThreads)
+            {
+                // light
+            }
+            else
+            {
+                _timer = new Timer(Monitor, null, 1000, Timeout.Infinite);
+            }
 
 
             SpawnNewThreads(Parameters.MinThreads);
@@ -89,6 +95,20 @@ namespace Ace.Networking.Threading
                 Initialize();
             }
             Interlocked.Increment(ref ClientCount);
+        }
+
+        public void Stop()
+        {
+            _timer?.Dispose();
+            ThreadList.Clear();// crash every enqueue attempt
+            while (_pending != 0) Thread.Sleep(2);
+            for (int i = 0; i < ThreadCount; i++)
+            {
+                ThreadList[i].Run = false;
+                ThreadList[i].WaitHandle.Set();
+            }
+            SendQueues = null;
+            ThreadCount = 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
