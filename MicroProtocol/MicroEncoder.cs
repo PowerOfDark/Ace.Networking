@@ -120,9 +120,8 @@ namespace Ace.Networking.MicroProtocol
 
             if (!_headerIsSent)
             {
-                var headerLength = CreateHeader();
-                int streamLen = (int)(_bodyStream.Length - _bodyStream.Position);
-                var bytesToWrite = (int) Math.Min(_bufferSlice.Capacity - headerLength, streamLen);
+                var headerLength = CreateHeader(out int streamLen);
+                var bytesToWrite = (int)Math.Min(_bufferSlice.Capacity - headerLength, streamLen);
                 _bodyStream.Read(_bufferSlice.Buffer, _bufferSlice.Offset + headerLength, bytesToWrite);
                 args.SetBuffer(_bufferSlice.Buffer, _bufferSlice.Offset, bytesToWrite + headerLength);
                 _bytesEnqueued = headerLength + bytesToWrite;
@@ -202,13 +201,14 @@ namespace Ace.Networking.MicroProtocol
             return new MicroEncoder(_serializer.Clone());
         }
 
-        private int CreateHeader()
+        private int CreateHeader(out int contentLength)
         {
+            contentLength = 0;
             if (_header is ContentHeader content)
             {
                 if (_message is Stream)
                 {
-                    _bodyStream = (Stream) _message;
+                    _bodyStream = (Stream)_message;
                     content.ContentType = _serializer.CreateContentType(typeof(Stream));
                 }
                 else if (_message is byte[] buf)
@@ -235,7 +235,7 @@ namespace Ace.Networking.MicroProtocol
                     content.ContentType = contentType;
                     _bodyStream.Position = 0;
                 }
-                content.ContentLength = (int) (_bodyStream.Length - _bodyStream.Position);
+                contentLength = content.ContentLength = (int)(_bodyStream.Length - _bodyStream.Position);
                 if (content.ContentLength == 0)
                 {
                     content.PacketFlag |= PacketFlag.NoContent;
@@ -243,11 +243,12 @@ namespace Ace.Networking.MicroProtocol
             }
             else if (_header is RawDataHeader raw)
             {
-                _bodyStream = (Stream) _message;
+                _bodyStream = (Stream)_message;
                 if (raw.ContentLength <= 0)
                 {
-                    raw.ContentLength = (int) (_bodyStream.Length-_bodyStream.Position);
+                    raw.ContentLength = (int)(_bodyStream.Length - _bodyStream.Position);
                 }
+                contentLength = raw.ContentLength;
                 _disposeBodyStream = raw.DisposeStreamAfterSend;
             }
 
@@ -256,8 +257,8 @@ namespace Ace.Networking.MicroProtocol
             _headerSize = 1 + 2; //
             sliceBuffer[sliceOffset + 2] = Version;
             _header.Serialize(_bufferSlice.Buffer, sliceOffset + 3);
-            _headerSize += (ushort) _header.Position;
-            BitConverter2.GetBytes((short) _headerSize, sliceBuffer, sliceOffset);
+            _headerSize += (ushort)_header.Position;
+            BitConverter2.GetBytes((short)_headerSize, sliceBuffer, sliceOffset);
 
             return _headerSize;
         }
