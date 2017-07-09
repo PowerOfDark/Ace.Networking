@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Ace.Networking.Interfaces;
@@ -10,13 +11,14 @@ namespace Ace.Networking.Threading
     public class ThreadedQueueProcessor<TItem>
     {
         private readonly ManualResetEvent _enqueueHandle = new ManualResetEvent(true);
-        private readonly ManualResetEvent _killingHandle = new ManualResetEvent(true);
+        private readonly ManualResetEvent _modifyHandle = new ManualResetEvent(true);
 
         private readonly object _threadLock = new object();
 
         protected readonly ThreadedQueueProcessorParameters Parameters;
 
         public readonly List<ThreadData> ThreadList;
+        private volatile bool _freeze;
         private volatile bool _killing;
         private int _pending;
         private Timer _timer;
@@ -30,7 +32,7 @@ namespace Ace.Networking.Threading
         protected int LastTickQueueSize = 0;
         protected long LastWorkTicks;
         protected long MonitorTick;
-        protected ConcurrentQueue<TItem>[] SendQueues;
+        protected ConcurrentQueue<ThreadedQueueItem<TItem>>[] SendQueues;
 
         protected volatile int ThreadCount;
 
@@ -67,14 +69,14 @@ namespace Ace.Networking.Threading
             {
                 return;
             }
-            SendQueues = new ConcurrentQueue<TItem>[Parameters.MaxThreads];
+            SendQueues = new ConcurrentQueue<ThreadedQueueItem<TItem>>[Parameters.MaxThreads];
             for (var i = 0; i < Parameters.MaxThreads; i++)
             {
-                SendQueues[i] = new ConcurrentQueue<TItem>();
+                SendQueues[i] = new ConcurrentQueue<ThreadedQueueItem<TItem>>();
                 ThreadList.Add(null);
             }
 
-            _timer = new Timer(Monitor, null, 1000, 1000 / Parameters.MonitorTickrate);
+            _timer = new Timer(Monitor, null, 1000, Timeout.Infinite);
 
 
             SpawnNewThreads(Parameters.MinThreads);
@@ -103,7 +105,11 @@ namespace Ace.Networking.Threading
             var clients = ClientCount;
             var target = currentThreadCount;
 
-            var cc = _pending;
+            var cc = 0; //_pending;
+            for (var i = 0; i < currentThreadCount; i++)
+            {
+                cc = Math.Max(cc, SendQueues[i].Count);
+            }
 
             if (cc >= BoostPeak + Parameters.BoostBarrier &&
                 MonitorTick - LastBoostTick >= Parameters.BoostCooldownTicks)
@@ -119,7 +125,7 @@ namespace Ace.Networking.Threading
             {
                 target = Parameters.MaxThreads;
             }
-            if (target > clients)
+            if (Parameters.MaxThreadsPerClient.HasValue && target > clients * Parameters.MaxThreadsPerClient.Value)
             {
                 target = clients;
             }
@@ -131,6 +137,32 @@ namespace Ace.Networking.Threading
                 lock (_threadLock)
                 {
                     SpawnNewThreads(toSpawn);
+                    var tc = ThreadCount;
+                    if (Parameters.PreservePartitioning)
+                    {
+                        _freeze = true;
+                        _modifyHandle.Reset();
+                        var count = SendQueues.Take(currentThreadCount).Select(t => t.Count).ToList();
+                        for (var i = 0; i < tc; i++)
+                        {
+                            var items = count[i];
+                            var q = SendQueues[i];
+                            for (var j = 0; j < items; j++)
+                            {
+                                if (!q.TryDequeue(out var item))
+                                {
+                                    continue;
+                                }
+                                SendQueues[Math.Abs(item.Discriminator % tc)].Enqueue(item);
+                            }
+                        }
+                        _freeze = false;
+                        _modifyHandle.Set();
+                        for (var i = 0; i < tc; i++)
+                        {
+                            ThreadList[i].WaitHandle.Set();
+                        }
+                    }
                 }
             }
             else
@@ -148,7 +180,9 @@ namespace Ace.Networking.Threading
                             for (var i = threadsRequired; i < currentThreadCount; i++)
                             {
                                 var delta = ThreadList[i].WorkTicksDelta;
-                                if (MonitorTick - ThreadList[i].StartTick <= Parameters.ThreadStartProtectionTicks)
+                                // if the thread has enqueued jobs or is under start-protection
+                                if (SendQueues[i].Count != 0 || MonitorTick - ThreadList[i].StartTick <=
+                                    Parameters.ThreadStartProtectionTicks)
                                 {
                                     continue;
                                 }
@@ -160,8 +194,7 @@ namespace Ace.Networking.Threading
                                 }
 
 
-                                if (MonitorTick - ThreadList[i].LastWorkTick >= Parameters.ThreadStopIdleTicks &&
-                                    SendQueues[i].Count == 0)
+                                if (MonitorTick - ThreadList[i].LastWorkTick >= Parameters.ThreadStopIdleTicks)
                                 {
                                     LastKillTick = MonitorTick;
                                     KillThread(i, currentThreadCount);
@@ -200,11 +233,12 @@ namespace Ace.Networking.Threading
             }
 
             Interlocked.Increment(ref MonitorTick);
+            _timer.Change(1000 / Parameters.MonitorTickrate, Timeout.Infinite);
         }
 
         private void KillThread(int id, int count)
         {
-            _killingHandle.Reset();
+            _modifyHandle.Reset();
             _killing = true;
             ThreadList[id].Run = false;
             ThreadList[id].WaitHandle.Set();
@@ -214,7 +248,7 @@ namespace Ace.Networking.Threading
             Interlocked.Decrement(ref ThreadCount);
             ThreadList[count - 1] = null;
             _killing = false;
-            _killingHandle.Set();
+            _modifyHandle.Set();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -254,9 +288,9 @@ namespace Ace.Networking.Threading
 
         public void Enqueue(TItem item, int discriminator)
         {
-            if (_killing)
+            if (_killing || _freeze)
             {
-                _killingHandle.WaitOne();
+                _modifyHandle.WaitOne();
             }
             if (_pending > Parameters.QueueCapacity)
             {
@@ -264,7 +298,7 @@ namespace Ace.Networking.Threading
             }
 
             var i = Math.Abs(discriminator % ThreadCount);
-            SendQueues[i].Enqueue(item);
+            SendQueues[i].Enqueue(new ThreadedQueueItem<TItem> {Item = item, Discriminator = (ushort) discriminator});
             Interlocked.Increment(ref _pending);
             ThreadList[i].WaitHandle.Set();
         }
@@ -279,11 +313,11 @@ namespace Ace.Networking.Threading
             var cState = true;
             while (data.Run)
             {
-                if (q.TryDequeue(out var item))
+                if (!_freeze && q.TryDequeue(out var item))
                 {
                     try
                     {
-                        Worker.DoWork(item);
+                        Worker.DoWork(item.Item);
                     }
                     catch
                     {
@@ -342,11 +376,11 @@ namespace Ace.Networking.Threading
             var handle = data.WaitHandle;
             while (data.Run)
             {
-                if (q.TryDequeue(out var item))
+                if (!_freeze && q.TryDequeue(out var item))
                 {
                     try
                     {
-                        Worker.DoWork(item);
+                        Worker.DoWork(item.Item);
                     }
                     catch
                     {
