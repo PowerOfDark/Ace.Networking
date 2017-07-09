@@ -233,9 +233,9 @@ namespace Ace.Networking.MicroProtocol
                             _message.GetType().AssemblyQualifiedName);
                     }
                     content.ContentType = contentType;
+                    _bodyStream.Position = 0;
                 }
                 content.ContentLength = (int) (_bodyStream.Length - _bodyStream.Position);
-                //_bodyStream.Position = 0;
                 if (content.ContentLength == 0)
                 {
                     content.PacketFlag |= PacketFlag.NoContent;
