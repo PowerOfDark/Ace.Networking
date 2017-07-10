@@ -77,7 +77,7 @@ namespace Ace.Networking.MicroProtocol.SSL
             {
                 case CertificateAttribute.CommonName: return "CN";
                 case CertificateAttribute.CountryName: return "C";
-                case CertificateAttribute.GivenName: return "G";
+                case CertificateAttribute.GivenName: return "GN";
                 case CertificateAttribute.Locality: return "L";
                 case CertificateAttribute.Organization: return "O";
                 case CertificateAttribute.OrganizationalUnit: return "OU";
