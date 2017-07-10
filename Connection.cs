@@ -363,7 +363,7 @@ namespace Ace.Networking
 
             try
             {
-                PayloadDispatchHandler?.Invoke(this, obj, type, SendResponse);
+                PayloadDispatchHandler?.Invoke(this, obj, type, SendResponse, unboxedRequest);
             }
             catch
             {
@@ -1031,7 +1031,7 @@ namespace Ace.Networking
         }
 
         internal delegate void InternalPayloadDispatchHandler(Connection connection, object payload, Type type,
-            Action<object> responseSender);
+            Action<object> responseSender, int? requestId);
 
         #region GRAVEYARD
 

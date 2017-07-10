@@ -249,9 +249,9 @@ namespace Ace.Networking
         }
 
         private void Con_DispatchPayload(Connection connection, object payload, Type type,
-            Action<object> responseSender)
+            Action<object> responseSender, int? requestId)
         {
-            ProcessPayloadHandlers(connection, payload, type, responseSender);
+            ProcessPayloadHandlers(connection, payload, type, responseSender, requestId);
             try
             {
                 PayloadReceived?.Invoke(connection, payload, type);
