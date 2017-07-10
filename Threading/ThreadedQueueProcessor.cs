@@ -100,12 +100,13 @@ namespace Ace.Networking.Threading
         public void Stop()
         {
             _timer?.Dispose();
+            var tmp = ThreadList.ToList();
             ThreadList.Clear();// crash every enqueue attempt
             while (_pending != 0) Thread.Sleep(2);
             for (int i = 0; i < ThreadCount; i++)
             {
-                ThreadList[i].Run = false;
-                ThreadList[i].WaitHandle.Set();
+                tmp[i].Run = false;
+                tmp[i].WaitHandle.Set();
             }
             SendQueues = null;
             ThreadCount = 0;
