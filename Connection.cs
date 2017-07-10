@@ -350,7 +350,7 @@ namespace Ace.Networking
                 }
             }
 
-            ProcessPayloadHandlers(this, obj, type, SendResponse);
+            ProcessPayloadHandlers(this, obj, type, SendResponse, unboxedRequest);
 
             try
             {

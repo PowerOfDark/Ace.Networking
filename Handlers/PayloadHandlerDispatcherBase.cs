@@ -14,8 +14,12 @@ namespace Ace.Networking.Handlers
 
         public delegate object PayloadHandler(Connection connection, object payload, Type type);
 
+        public delegate void RequestHandler(RequestWrapper request);
+
         protected ConcurrentDictionary<Type, LinkedList<IPayloadHandlerWrapper>> TypeHandlers =
             new ConcurrentDictionary<Type, LinkedList<IPayloadHandlerWrapper>>();
+
+        protected ConcurrentDictionary<Type, RequestHandler> RequestHandlers = new ConcurrentDictionary<Type, RequestHandler>();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void AppendTypeHandler(Type type, IPayloadHandlerWrapper handler)
@@ -39,6 +43,7 @@ namespace Ace.Networking.Handlers
 
         protected bool RemoveAllTypeHandlers(Type type)
         {
+            RequestHandlers.TryRemove(type, out _);
             if (TypeHandlers.TryGetValue(type, out var list))
             {
                 lock (list)
@@ -53,6 +58,7 @@ namespace Ace.Networking.Handlers
         public void RemoveAllTypeHandlers()
         {
             TypeHandlers.Clear();
+            RequestHandlers.Clear();
         }
     }
 }

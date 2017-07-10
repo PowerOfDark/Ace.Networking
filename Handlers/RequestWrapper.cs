@@ -19,5 +19,16 @@ namespace Ace.Networking.Handlers
         {
             return Connection.EnqueueSendResponse(RequestId, response);
         }
+
+        public bool TrySendResponse<T>(T response, out Task task)
+        {
+            if (!Connection.Connected)
+            {
+                task = null;
+                return false;
+            }
+            task = Connection.EnqueueSendResponse(RequestId, response);
+            return true;
+        }
     }
 }

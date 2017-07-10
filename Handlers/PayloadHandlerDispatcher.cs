@@ -77,8 +77,64 @@ namespace Ace.Networking.Handlers
             RemoveAllTypeHandlers();
         }
 
+        /// <summary>
+        /// WARNING: This function overwrites the specified request handler
+        /// </summary>
+        public void OnRequest(Type type, RequestHandler handler)
+        {
+            if (!RequestHandlers.TryAdd(type, handler))
+            {
+                try
+                {
+                    RequestHandlers[type] = handler;
+                }
+                catch { }
+            }
+        }
+
+        /// <summary>
+        /// WARNING: This function overwrites the specified request handler
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void OnRequest<T>(RequestHandler handler)
+        {
+            OnRequest(typeof(T), handler);
+        }
+
+        /// <summary>
+        /// Returns the current request handler for the specified type, or null if doesn't exist
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public RequestHandler OnRequest(Type type)
+        {
+            if (RequestHandlers.TryGetValue(type, out var handler))
+                return handler;
+            return null;
+        }
+
+        /// <summary>
+        /// Returns the current request handler for the specified type, or null if doesn't exist
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public RequestHandler OnRequest<T>()
+        {
+            return OnRequest(typeof(T));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool OffRequest(Type type)
+        {
+            return RequestHandlers.TryRemove(type, out _);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool OffRequest<T>()
+        {
+            return OffRequest(typeof(T));
+        }
+
         protected void ProcessPayloadHandlers(Connection connection, object obj, Type type,
-            Action<object> responseSender = null)
+            Action<object> responseSender = null, int? requestId = null)
         {
             if (TypeHandlers.TryGetValue(type, out var list))
             {
@@ -103,6 +159,19 @@ namespace Ace.Networking.Handlers
                     // An exception in one of the handlers breaks the chain
                 }
             }
+
+            if (requestId.HasValue)
+            {
+                if (RequestHandlers.TryGetValue(type, out var handler))
+                {
+                    try
+                    {
+                        handler?.Invoke(new RequestWrapper(connection, requestId.Value, obj));
+                    }
+                    catch { }
+                }
+            }
+
         }
     }
 }
