@@ -276,7 +276,7 @@ namespace Ace.Networking
                     {
                         if (_responseHandlers.TryRemove(tHeader.RequestId, out var tcs))
                         {
-                            tcs.SetResult(obj);
+                            tcs.TrySetResult(obj);
                         }
                     }
                 }
