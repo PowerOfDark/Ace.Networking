@@ -108,6 +108,7 @@ namespace Ace.Networking.Threading
                 tmp[i].Run = false;
                 tmp[i].WaitHandle.Set();
             }
+            tmp.Clear();
             SendQueues = null;
             ThreadCount = 0;
         }
