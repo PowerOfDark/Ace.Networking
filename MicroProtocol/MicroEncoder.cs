@@ -257,11 +257,11 @@ namespace Ace.Networking.MicroProtocol
             _headerSize = 1 + 2; //
             sliceBuffer[sliceOffset + 2] = Version;
             _header.Serialize(_bufferSlice.Buffer, sliceOffset + 3);
-            if (_header.Position > ushort.MaxValue)
+            _headerSize += _header.Position;
+            if (_headerSize > ushort.MaxValue)
             {
                 throw new InvalidDataException("Invalid header");
             }
-            _headerSize += (ushort)_header.Position;
             BitConverter2.GetBytes((short)_headerSize, sliceBuffer, sliceOffset);
 
             return _headerSize;

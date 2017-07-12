@@ -10,7 +10,16 @@ namespace Ace.Networking.MicroProtocol.Headers
         }
 
         public byte[] ContentType { get; set; }
-        public ushort ContentTypeLength => (ushort)(ContentType?.Length ?? 0);
+
+        public ushort ContentTypeLength
+        {
+            get
+            {
+                var len = (ContentType?.Length ?? 0);
+                if (len > ushort.MaxValue) throw new InvalidOperationException("Invalid header length");
+                return (ushort)len;
+            }
+        }
 
         public int ContentLength { get; set; }
 
