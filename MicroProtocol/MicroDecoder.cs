@@ -25,7 +25,7 @@ namespace Ace.Networking.MicroProtocol
         private int _bytesLeftInSocketBuffer;
         private BasicHeader _headerObject;
         private int _headerOffset;
-        private short _headerSize;
+        private ushort _headerSize;
 
         private Action<BasicHeader, object, Type> _messageReceived;
         private byte _protocolVersion;
@@ -123,8 +123,8 @@ namespace Ace.Networking.MicroProtocol
                 return false;
             }
 
-            _headerSize = BitConverter.ToInt16(_header, 0);
-            _bytesLeftForCurrentState = _headerSize - sizeof(short);
+            _headerSize = BitConverter.ToUInt16(_header, 0);
+            _bytesLeftForCurrentState = _headerSize - sizeof(ushort);
             _stateMethod = ProcessFixedHeader;
             _headerOffset = 0;
             return true;
@@ -200,7 +200,7 @@ namespace Ace.Networking.MicroProtocol
             }
             SKIP_CHECKS:
 
-            _bytesLeftForCurrentState = sizeof(short);
+            _bytesLeftForCurrentState = sizeof(ushort);
             _headerOffset = 0;
             _stateMethod = ReadHeaderLength;
             _contentStream.Position = 0;
