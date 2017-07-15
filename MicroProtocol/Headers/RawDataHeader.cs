@@ -1,5 +1,4 @@
 ﻿using System;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.IO;
 using Ace.Networking.MicroProtocol.Enums;
 
@@ -25,7 +24,7 @@ namespace Ace.Networking.MicroProtocol.Headers
         public int RawDataSeq { get; set; }
         public int ContentLength { get; set; }
 
-        [NotMapped]
+        //[NotMapped]
         internal bool DisposeStreamAfterSend { get; set; }
 
         public override void Serialize(byte[] target, int offset = 0)
