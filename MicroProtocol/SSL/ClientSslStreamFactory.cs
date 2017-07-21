@@ -79,12 +79,11 @@ namespace Ace.Networking.MicroProtocol.SSL
             return stream;
         }
 
-        protected X509Certificate OnCertificateSelection(object sender, string targetHost, X509CertificateCollection localCertificates, X509Certificate remoteCertificate, string[] acceptableIssuers)
+        protected X509Certificate OnCertificateSelection(object sender, string targetHost, X509CertificateCollection localCertificates,
+            X509Certificate remoteCertificate, string[] acceptableIssuers)
         {
             return ((localCertificates?.Count ?? 0) > 0 ? localCertificates[0] : null) ?? Certificate;
         }
-
-
 
 
         /// <summary>

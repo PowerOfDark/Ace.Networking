@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography.X509Certificates;
+﻿using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.SSL;
 using Ace.Networking.Threading;
@@ -43,7 +44,7 @@ namespace Ace.Networking
         }
 
         public virtual ClientSslStreamFactory GetClientSslFactory(string targetCommonName = "",
-            X509Certificate2 certificate = null)
+            X509Certificate2 certificate = null, SslProtocols protocols = SslProtocols.Tls12)
         {
             return null;
         }
