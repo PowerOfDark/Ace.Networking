@@ -50,7 +50,7 @@ namespace Ace.Networking.MicroProtocol.SSL
         /// <returns>Stream which is ready to be used (must have been validated)</returns>
         public SslStream Build(Connection connection)
         {
-            var stream = new SslStream(connection.Client.GetStream(), true, OnRemoteCertificateValidation);
+            var stream = new SslStream(connection.Client.GetStream(), true, OnRemoteCertificateValidation, OnCertificateSelection);
 
             try
             {
@@ -78,6 +78,14 @@ namespace Ace.Networking.MicroProtocol.SSL
 
             return stream;
         }
+
+        protected X509Certificate OnCertificateSelection(object sender, string targetHost, X509CertificateCollection localCertificates, X509Certificate remoteCertificate, string[] acceptableIssuers)
+        {
+            return ((localCertificates?.Count ?? 0) > 0 ? localCertificates[0] : null) ?? Certificate;
+        }
+
+
+
 
         /// <summary>
         ///     Used to validate the certificate that the server have provided.
