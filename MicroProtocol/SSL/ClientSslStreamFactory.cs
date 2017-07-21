@@ -17,7 +17,7 @@ namespace Ace.Networking.MicroProtocol.SSL
         /// <param name="commonName">the domain name of the server that you are connecting to</param>
         /// <param name="certificate"></param>
         /// <param name="protocols"></param>
-        public ClientSslStreamFactory(string commonName, X509Certificate certificate = null,
+        public ClientSslStreamFactory(string commonName, X509Certificate2 certificate = null,
             SslProtocols protocols = SslProtocols.Tls12)
         {
             CommonName = commonName;
@@ -50,7 +50,7 @@ namespace Ace.Networking.MicroProtocol.SSL
         /// <returns>Stream which is ready to be used (must have been validated)</returns>
         public SslStream Build(Connection connection)
         {
-            var stream = new SslStream(connection.Client.GetStream(), true, OnRemoteCertifiateValidation);
+            var stream = new SslStream(connection.Client.GetStream(), true, OnRemoteCertificateValidation);
 
             try
             {
@@ -87,7 +87,7 @@ namespace Ace.Networking.MicroProtocol.SSL
         /// <param name="chain">The chain.</param>
         /// <param name="sslpolicyerrors">The sslpolicyerrors.</param>
         /// <returns><c>true</c> if the certificate will be allowed, otherwise <c>false</c>.</returns>
-        protected virtual bool OnRemoteCertifiateValidation(object sender, X509Certificate certificate, X509Chain chain,
+        protected virtual bool OnRemoteCertificateValidation(object sender, X509Certificate certificate, X509Chain chain,
             SslPolicyErrors sslpolicyerrors)
         {
             RemoteCertificate = new BasicCertificateInfo(certificate);

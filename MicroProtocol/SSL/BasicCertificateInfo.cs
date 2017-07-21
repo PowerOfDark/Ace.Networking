@@ -9,8 +9,8 @@ namespace Ace.Networking.MicroProtocol.SSL
     {
         public BasicCertificateInfo(X509Certificate certificate)
         {
-            Subject = certificate.Subject;
-            Issuer = certificate.Issuer;
+            Subject = certificate?.Subject;
+            Issuer = certificate?.Issuer;
         }
 
         public string Subject { get; protected set; }

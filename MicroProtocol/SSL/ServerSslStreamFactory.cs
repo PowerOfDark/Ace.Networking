@@ -9,7 +9,7 @@ namespace Ace.Networking.MicroProtocol.SSL
 {
     public class ServerSslStreamFactory : ISslStreamFactory
     {
-        public ServerSslStreamFactory(X509Certificate certificate, bool useClient = true,
+        public ServerSslStreamFactory(X509Certificate2 certificate, bool useClient = true,
             SslProtocols allowedProtocols = SslProtocols.Tls12)
         {
             Certificate = certificate ?? throw new ArgumentNullException(nameof(certificate));
@@ -34,7 +34,7 @@ namespace Ace.Networking.MicroProtocol.SSL
 
         public SslStream Build(Connection connection)
         {
-            var stream = new SslStream(connection.Client.GetStream(), true, OnRemoteCertifiateValidation);
+            var stream = new SslStream(connection.Client.GetStream(), true, OnRemoteCertificateValidation);
 
             try
             {
@@ -67,11 +67,11 @@ namespace Ace.Networking.MicroProtocol.SSL
 
         public SslPolicyErrors RemotePolicyErrors { get; protected set; }
 
-        protected virtual bool OnRemoteCertifiateValidation(object sender, X509Certificate certificate, X509Chain chain,
+        protected virtual bool OnRemoteCertificateValidation(object sender, X509Certificate certificate, X509Chain chain,
             SslPolicyErrors sslpolicyerrors)
         {
             RemoteCertificate = new BasicCertificateInfo(certificate);
-            RemotePolicyErrors = SslPolicyErrors.None;
+            RemotePolicyErrors = sslpolicyerrors;
             if (UseClientCertificate)
             {
                 if (sslpolicyerrors != SslPolicyErrors.None)

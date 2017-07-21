@@ -43,12 +43,12 @@ namespace Ace.Networking
         }
 
         public virtual ClientSslStreamFactory GetClientSslFactory(string targetCommonName = "",
-            X509Certificate certificate = null)
+            X509Certificate2 certificate = null)
         {
             return null;
         }
 
-        public virtual ServerSslStreamFactory GetServerSslFactory(X509Certificate certificate = null)
+        public virtual ServerSslStreamFactory GetServerSslFactory(X509Certificate2 certificate = null)
         {
             return null;
         }
