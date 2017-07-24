@@ -293,7 +293,7 @@ namespace Ace.Networking.Threading
             var tick = MonitorTick;
             for (var i = 0; i < count; i++)
             {
-                var t = ThreadCount == 0 ? new Thread(WorkMain) : new Thread(Work);
+                var t = new Thread(WorkWrapper);
                 var data = new ThreadData
                 {
                     Thread = t,
@@ -325,10 +325,10 @@ namespace Ace.Networking.Threading
             ThreadList[i].WaitHandle.Set();
         }
 
-        private void WorkMain(object state)
+        private void WorkMain(ThreadData state)
         {
             //Console.WriteLine("Main thread started");
-            var data = (ThreadData) state;
+            var data = state;
             var q = SendQueues[data.Id];
             var handle = data.WaitHandle;
             var barrier = Parameters.QueueCapacity;
@@ -389,11 +389,23 @@ namespace Ace.Networking.Threading
             }
         }
 
+        protected virtual void WorkWrapper(object state)
+        {
+            var st = (ThreadData)state;
+            if (st.Id == 0)
+            {
+                WorkMain(st);
+            }
+            else
+            {
+                Work(st);
+            }
+        }
 
-        private void Work(object state)
+        private void Work(ThreadData state)
         {
             //Console.WriteLine($"Thread {Thread.CurrentThread.ManagedThreadId} started");
-            var data = (ThreadData) state;
+            var data = state;
             var q = SendQueues[data.Id];
             var handle = data.WaitHandle;
             while (data.Run)
