@@ -13,7 +13,6 @@ using Ace.Networking.Interfaces;
 using Ace.Networking.MicroProtocol.Enums;
 using Ace.Networking.MicroProtocol.Headers;
 using Ace.Networking.MicroProtocol.Interfaces;
-using Ace.Networking.MicroProtocol.PacketTypes;
 using Ace.Networking.MicroProtocol.SSL;
 using Ace.Networking.MicroProtocol.Structures;
 using Ace.Networking.Structures;
@@ -30,41 +29,41 @@ namespace Ace.Networking
 
         public const int BufferSize = 16384;
 
-        private static long _lastId = 1;
-        private static int _lastRawDataBufferId = 1;
-        private static int _lastRequestId = 1;
-        private readonly SemaphoreSlim _closeEvent = new SemaphoreSlim(0, 1);
+        internal static long _lastId = 1;
+        internal static int _lastRawDataBufferId = 1;
+        internal static int _lastRequestId = 1;
+        internal readonly SemaphoreSlim _closeEvent = new SemaphoreSlim(0, 1);
 
-        private readonly IPayloadDecoder _decoder;
+        internal readonly IPayloadDecoder _decoder;
 
 
-        private readonly IPayloadEncoder _encoder;
+        internal readonly IPayloadEncoder _encoder;
 
-        private readonly ConcurrentDictionary<int, LinkedList<RawDataHandler>> _rawDataHandlers =
+        internal readonly ConcurrentDictionary<int, LinkedList<RawDataHandler>> _rawDataHandlers =
             new ConcurrentDictionary<int, LinkedList<RawDataHandler>>();
 
-        private readonly LinkedList<TaskCompletionSource<object>> _receiveFilters =
+        internal readonly LinkedList<TaskCompletionSource<object>> _receiveFilters =
             new LinkedList<TaskCompletionSource<object>>();
 
-        private readonly object _receiveFiltersLock = new object();
-        private readonly SemaphoreSlim _receiveLock = new SemaphoreSlim(1, 1);
+        internal readonly object _receiveFiltersLock = new object();
+        internal readonly SemaphoreSlim _receiveLock = new SemaphoreSlim(1, 1);
 
         /// <summary>
         ///     where object is TaskCompletionSource of T; can't avoid boxing/unboxing
         /// </summary>
-        private readonly ConcurrentDictionary<Type, LinkedList<TaskCompletionSource<object>>> _receiveTypeFilters =
+        internal readonly ConcurrentDictionary<Type, LinkedList<TaskCompletionSource<object>>> _receiveTypeFilters =
             new ConcurrentDictionary<Type, LinkedList<TaskCompletionSource<object>>>();
 
-        private readonly ConcurrentDictionary<Type, Queue<TaskCompletionSource<RequestWrapper>>>
+        internal readonly ConcurrentDictionary<Type, Queue<TaskCompletionSource<RequestWrapper>>>
             _requestHandlers =
                 new ConcurrentDictionary<Type, Queue<TaskCompletionSource<RequestWrapper>>>();
 
-        private readonly ConcurrentDictionary<int, TaskCompletionSource<object>> _responseHandlers =
+        internal readonly ConcurrentDictionary<int, TaskCompletionSource<object>> _responseHandlers =
             new ConcurrentDictionary<int, TaskCompletionSource<object>>();
 
-        private readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
+        internal readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
 
-        private readonly ConcurrentQueue<TaskCompletionSource<object>> _sendQueue =
+        internal readonly ConcurrentQueue<TaskCompletionSource<object>> _sendQueue =
             new ConcurrentQueue<TaskCompletionSource<object>>();
 
         private readonly AutoResetEvent _sendWorkerWaitHandle = new AutoResetEvent(false);
@@ -149,7 +148,7 @@ namespace Ace.Networking
         }
 
         public IConnectionData Data { get; set; }
-        public ISslCertificatePair SslCertificates => _sslFactory;
+        public SslCertificatePair SslCertificates { get; internal set; }
 
         /// <summary>
         ///     Gets the <code>DateTime</code> of the last received packet.
@@ -233,7 +232,7 @@ namespace Ace.Networking
         private void DispatchPayloadReceived(BasicHeader header, object obj, Type type)
         {
             CustomIncomingMessageQueue.Enqueue(new ReceiveMessageQueueItem(OnPayloadReceived, header, obj, type),
-                (int) Identifier);
+                GetHashCode());
         }
 
         private void OnDisconnected()
@@ -291,11 +290,11 @@ namespace Ace.Networking
                 }
                 if (unboxedRequest.HasValue)
                 {
-                    EnqueueSendResponse(((TrackableHeader) header).RequestId, o);
+                    this.EnqueueSendResponse(((TrackableHeader) header).RequestId, o);
                 }
                 else
                 {
-                    EnqueueSend(o);
+                    this.EnqueueSend(o);
                 }
             }
 
@@ -321,7 +320,6 @@ namespace Ace.Networking
                     while (enumerator != null)
                     {
                         var delete = true;
-                        //if (enumerator.Value.Task.IsCompleted || enumerator.Value.Task.IsCanceled) delete = true;
                         if (enumerator.Value.Task.AsyncState is PayloadFilter f)
                         {
                             try
@@ -390,7 +388,7 @@ namespace Ace.Networking
                 {
                     return;
                 }
-                EnqueueSend(o);
+                this.EnqueueSend(o);
             }
 
             if (_rawDataHandlers.Count > 0)
@@ -615,70 +613,6 @@ namespace Ace.Networking
             return tcs.Task;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task EnqueueSendContent<T>(T payload)
-        {
-            return EnqueueSendPacket(new PreparedPacket<ContentHeader, T>(new ContentHeader(), payload));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal Task EnqueueSend<T>(T payload)
-        {
-            if (payload is IPreparedPacket p)
-            {
-                return EnqueueSendPacket(p);
-            }
-            return EnqueueSendContent(payload);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task Send<T>(T payload)
-        {
-            return EnqueueSendContent(payload);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal Task EnqueueSendResponse<T>(int requestId, T response)
-        {
-            return EnqueueSendPacket(new TrackablePacket<T>(new TrackableHeader(requestId, PacketFlag.IsResponse),
-                response));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal Task EnqueueSendResponse<T>(TrackableHeader requestHeader, T response)
-        {
-            return EnqueueSendResponse(requestHeader.RequestId, response);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task EnqueueSendRaw(int bufId, int seq, byte[] buf, int count = -1)
-        {
-            return EnqueueSendPacket(new RawDataPacket(new RawDataHeader(bufId, seq), buf, count));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task EnqueueSendRaw(int bufId, byte[] buf, int count = -1)
-        {
-            return EnqueueSendRaw(bufId, 0, buf, count);
-        }
-
-        /// <summary>
-        ///     WARNING: This function uses the specified Stream to stream data.
-        ///     If <paramref name="disposeAfterSend" /> is true, the Stream will be disposed after the send operation is completed.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task EnqueueSendRaw(int bufferId, int seq, Stream stream, int count = -1, bool disposeAfterSend = true)
-        {
-            return EnqueueSendPacket(new RawDataPacket(new RawDataHeader(bufferId, seq, count, disposeAfterSend), stream));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task EnqueueSendRaw(int bufferId, Stream stream, int count = -1, bool disposeAfterSend = true)
-        {
-            return EnqueueSendRaw(bufferId, 0, stream, count, disposeAfterSend);
-        }
-
-
         public void Close()
         {
             try
@@ -804,7 +738,6 @@ namespace Ace.Networking
             _receiveWorkerThreadRunning = false;
         }
 
-
         public Task CloseAsync()
         {
             Socket.Shutdown(SocketShutdown.Send);
@@ -820,119 +753,6 @@ namespace Ace.Networking
             return t;
         }
 
-        /// <summary>
-        ///     Returns the first packet for which <b>filter</b> yields true
-        /// </summary>
-        /// <param name="filter"></param>
-        /// <param name="timeout"></param>
-        /// <returns></returns>
-        public Task<object> Receive(PayloadFilter filter, TimeSpan? timeout = null)
-        {
-            var tcs = new TaskCompletionSource<object>(filter);
-
-            lock (_receiveFiltersLock)
-            {
-                _receiveFilters.AddLast(tcs);
-            }
-
-            if (timeout.HasValue)
-            {
-                var cts = new CancellationTokenSource(timeout.Value);
-                cts.Token.Register(t => ((TaskCompletionSource<object>) t).TrySetCanceled(), tcs);
-            }
-            return tcs.Task;
-        }
-
-        public async Task<T> Receive<T>(TimeSpan? timeout = null)
-        {
-            var tcs = new TaskCompletionSource<object>();
-            if (!_receiveTypeFilters.TryAddLast(typeof(T), tcs))
-            {
-                throw new InvalidOperationException();
-            }
-
-            if (timeout.HasValue)
-            {
-                var cts = new CancellationTokenSource(timeout.Value);
-                cts.Token.Register(t => ((TaskCompletionSource<object>) t).TrySetCanceled(), tcs);
-            }
-            return (T) await tcs.Task;
-        }
-
-        public Task<object> SendReceive<TSend>(TSend obj, PayloadFilter filter, TimeSpan? timeout = null)
-        {
-            var res = Receive(filter, timeout);
-            Send(obj);
-            return res;
-        }
-
-        public Task<TReceive> SendReceive<TSend, TReceive>(TSend obj, TimeSpan? timeout = null)
-        {
-            var res = Receive<TReceive>(timeout);
-            Send(obj);
-            return res;
-        }
-
-        public Task<object> SendRequest<TRequest>(TRequest req, TimeSpan? timeout = null)
-        {
-            var id = Interlocked.Increment(ref _lastRequestId);
-            var tcs = new TaskCompletionSource<object>(id);
-
-            if (!_responseHandlers.TryAdd(id, tcs))
-            {
-                throw new InvalidOperationException();
-            }
-
-            EnqueueSendPacket(new TrackablePacket<TRequest>(new TrackableHeader(id, PacketFlag.IsRequest), req));
-
-            if (timeout.HasValue)
-            {
-                var cts = new CancellationTokenSource(timeout.Value);
-                cts.Token.Register(t =>
-                {
-                    var task = (TaskCompletionSource<object>) t;
-                    task.TrySetCanceled();
-                    _responseHandlers.TryRemove((int) task.Task.AsyncState, out _);
-                }, tcs);
-            }
-            return tcs.Task;
-        }
-
-        public Task<RequestWrapper> ReceiveRequest(Type type, TimeSpan? timeout = null)
-        {
-            var tcs = new TaskCompletionSource<RequestWrapper>();
-
-            if (!_requestHandlers.TryEnqueue(type, tcs))
-            {
-                throw new InvalidOperationException();
-            }
-
-            if (timeout.HasValue)
-            {
-                var cts = new CancellationTokenSource(timeout.Value);
-                cts.Token.Register(t => ((TaskCompletionSource<RequestWrapper>) t).TrySetCanceled(), tcs);
-            }
-            return tcs.Task;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<RequestWrapper> ReceiveRequest<T>(TimeSpan? timeout = null)
-        {
-            return ReceiveRequest(typeof(T), timeout);
-        }
-
-        /// <summary>
-        /// </summary>
-        /// <typeparam name="TRequest">Request type</typeparam>
-        /// <typeparam name="TResponse">Response type</typeparam>
-        /// <param name="req"></param>
-        /// <param name="timeout"></param>
-        /// <returns>Return value of non-generic SendRequest casted to TResponse</returns>
-        public async Task<TResponse> SendRequest<TRequest, TResponse>(TRequest req, TimeSpan? timeout = null)
-        {
-            var res = await SendRequest(req, timeout);
-            return (TResponse) res;
-        }
 
         public void AppendIncomingRawDataHandler(int bufId, RawDataHandler handler)
         {
@@ -981,192 +801,8 @@ namespace Ace.Networking
             return _rawDataHandlers.TryRemove(bufId, out _);
         }
 
-        public static void DisplaySecurityLevel(SslStream stream)
-        {
-            Console.WriteLine("Cipher: {0} strength {1}", stream.CipherAlgorithm, stream.CipherStrength);
-            Console.WriteLine("Hash: {0} strength {1}", stream.HashAlgorithm, stream.HashStrength);
-            Console.WriteLine("Key exchange: {0} strength {1}", stream.KeyExchangeAlgorithm,
-                stream.KeyExchangeStrength);
-            Console.WriteLine("Protocol: {0}", stream.SslProtocol);
-        }
-
-        public static void DisplaySecurityServices(SslStream stream)
-        {
-            Console.WriteLine("Is authenticated: {0} as server? {1}", stream.IsAuthenticated, stream.IsServer);
-            Console.WriteLine("IsSigned: {0}", stream.IsSigned);
-            Console.WriteLine("Is Encrypted: {0}", stream.IsEncrypted);
-        }
-
-        public static void DisplayStreamProperties(SslStream stream)
-        {
-            Console.WriteLine("Can read: {0}, write {1}", stream.CanRead, stream.CanWrite);
-            Console.WriteLine("Can timeout: {0}", stream.CanTimeout);
-        }
-
-        public static void DisplayCertificateInformation(SslStream stream)
-        {
-            Console.WriteLine("Certificate revocation list checked: {0}", stream.CheckCertRevocationStatus);
-
-            var localCertificate = stream.LocalCertificate;
-            if (stream.LocalCertificate != null)
-            {
-                Console.WriteLine("Local cert was issued to {0}.",
-                    localCertificate.Subject);
-            }
-            else
-            {
-                Console.WriteLine("Local certificate is null.");
-            }
-            // Display the properties of the client's certificate.
-            var remoteCertificate = stream.RemoteCertificate;
-            if (stream.RemoteCertificate != null)
-            {
-                Console.WriteLine("Remote cert was issued to.",
-                    remoteCertificate.Subject);
-            }
-            else
-            {
-                Console.WriteLine("Remote certificate is null.");
-            }
-        }
-
         internal delegate void InternalPayloadDispatchHandler(Connection connection, object payload, Type type,
             Action<object> responseSender, int? requestId);
-
-        #region GRAVEYARD
-
-        /*protected virtual async void ReadAsync()
-        {
-            try
-            {
-                
-                var isPending = Client.Client.ReceiveAsync(_readArgs);
-                if (!isPending)
-                {
-                    OnReadCompleted(Client, _readArgs);
-                }
-            }
-            catch (SocketException e)
-            {
-                HandleRemoteDisconnect(e.SocketErrorCode, e);
-            }
-            catch (Exception e)
-            {
-                HandleRemoteDisconnect(SocketError.SocketError, e);
-            }
-            try
-            {
-                int read = await _stream.ReadAsync(_readBuffer.Buffer, _readBuffer.Offset, _readBuffer.Capacity);
-                OnReadCompleted(read);
-            }
-            catch (Exception e)
-            {
-                HandleRemoteDisconnect(SocketError.SocketError, e);
-            }
-
-        }
-
-        private void OnReadCompleted(int read)
-        {
-            LastReceived = DateTime.Now;
-            if (read == 0)
-            {
-                try
-                {
-                    //_socket.Dispose();
-                    Close();
-                    //Close();
-                }
-                catch { }
-                //HandleRemoteDisconnect(e.SocketError, new SocketException((int)e.SocketError));
-                return;
-            }
-
-            _readBuffer.BytesTransferred = read;
-            _readBuffer.Offset = _readBuffer.BaseOffset;
-            _readBuffer.Count = read;
-
-            try
-            {
-                // pre processor can have read everything
-                if (_readBuffer.Count > 0)
-                    _decoder.ProcessReadBytes(_readBuffer);
-            }
-            catch (Exception exception)
-            {
-                HandleRemoteDisconnect(SocketError.SocketError, exception);
-                //ChannelFailure(this, exception);
-
-                // Cleanup before both pending operations have exited.
-                try
-                {
-                    if (!Socket.Connected)
-                        return;
-                }
-                catch (NullReferenceException)
-                {
-                    //rare case of race condition during cleanup.
-                    return;
-                }
-            }
-            ReadAsync();
-        }
-        */
-
-        /*
-        protected virtual async void Send(IPreparedPacket msg)
-        {
-            if (Socket == null || !Socket.Connected)
-                throw new SocketException((int)SocketError.NotInitialized);
-
-            _payloadPending = msg;
-            _payloadPendingType = msg.GetType();
-            await _sendLock.WaitAsync();
-            //lock (_writeLock)
-            {
-                _encoder.Prepare(msg);
-                _encoder.Send(_writeBuffer);
-                try
-                {
-                    await _stream.WriteAsync(_writeBuffer.Buffer, _writeBuffer.Offset, _writeBuffer.Count);
-                    OnSendCompleted();
-                }
-                catch (Exception ex)
-                {
-                    HandleRemoteDisconnect(SocketError.SocketError, ex);
-                }
-            }
-
-        }
-
-        private async void OnSendCompleted()
-        {
-
-            try
-            {
-                var isComplete = _encoder.OnSendCompleted(_writeBuffer.Count);
-                if (!isComplete)
-                {
-                    _encoder.Send(_writeBuffer);
-                    await _stream.WriteAsync(_writeBuffer.Buffer, _writeBuffer.Offset, _writeBuffer.Count);
-                    OnSendCompleted();
-                    return;
-                }
-
-                _sendLock.Release();
-                _sendCompletionSource?.SetResult(_payloadPending);
-                PayloadSent?.Invoke(this, _payloadPending, _payloadPendingType);
-            }
-            catch (Exception ex)
-            {
-                //_sendLock.Release();
-                //OnChannelFailure(ex);
-                HandleRemoteDisconnect(SocketError.TimedOut, ex);
-            }
-        }
-        */
-
-        #endregion
 
         #region IDisposable Support
 

@@ -34,7 +34,8 @@ namespace Ace.Networking.MicroProtocol.SSL
 
         public SslStream Build(Connection connection)
         {
-            var stream = new SslStream(connection.Client.GetStream(), true, OnRemoteCertificateValidation);
+            connection.SslCertificates = new SslCertificatePair { Certificate = Certificate };
+            var stream = new SslStream(connection.Client.GetStream(), true, (s, cert, chain, err) => OnRemoteCertificateValidation(connection, cert, chain, err));
 
             try
             {
@@ -63,15 +64,12 @@ namespace Ace.Networking.MicroProtocol.SSL
         /// </summary>
         public X509Certificate Certificate { get; }
 
-        public BasicCertificateInfo RemoteCertificate { get; protected set; }
 
-        public SslPolicyErrors RemotePolicyErrors { get; protected set; }
-
-        protected virtual bool OnRemoteCertificateValidation(object sender, X509Certificate certificate, X509Chain chain,
+        protected virtual bool OnRemoteCertificateValidation(Connection sender, X509Certificate certificate, X509Chain chain,
             SslPolicyErrors sslpolicyerrors)
         {
-            RemoteCertificate = new BasicCertificateInfo(certificate);
-            RemotePolicyErrors = sslpolicyerrors;
+            sender.SslCertificates.RemoteCertificate = new BasicCertificateInfo(certificate);
+            sender.SslCertificates.RemotePolicyErrors = sslpolicyerrors;
             if (UseClientCertificate)
             {
                 if (sslpolicyerrors != SslPolicyErrors.None)

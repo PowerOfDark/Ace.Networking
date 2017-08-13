@@ -1,12 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netcoreapp1.1;net46</TargetFrameworks>
+    <TargetFrameworks>netstandard1.6</TargetFrameworks>
     <DefineConstants Condition=" '$(TargetFramework)' == 'netcoreapp1.1' ">CORE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="protobuf-net" Version="2.1.0" />
+    <PackageReference Include="protobuf-net" Version="2.3.2" />
+    <PackageReference Include="System.Net.Security" Version="4.3.1" />
+    <PackageReference Include="System.Threading.Thread" Version="4.3.0" />
   </ItemGroup>
 
 </Project>

@@ -17,7 +17,9 @@ namespace Ace.Networking.Threading
         {
             if (_createContext != null)
             {
-                var ctx = _createContext.Invoke((ThreadData) state);
+                var data = (ThreadData)state;
+                var ctx = _createContext.Invoke(data);
+                
                 using (ctx)
                 {
                     base.WorkWrapper(state);

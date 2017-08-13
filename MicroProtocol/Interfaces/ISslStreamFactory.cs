@@ -2,7 +2,7 @@
 
 namespace Ace.Networking.MicroProtocol.Interfaces
 {
-    public interface ISslStreamFactory : ISslCertificatePair
+    public interface ISslStreamFactory
     {
         /// <summary>
         ///     Build a new SSL steam.

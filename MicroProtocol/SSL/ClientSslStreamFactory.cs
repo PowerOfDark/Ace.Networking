@@ -40,18 +40,16 @@ namespace Ace.Networking.MicroProtocol.SSL
         /// </summary>
         public X509Certificate Certificate { get; set; }
 
-        public BasicCertificateInfo RemoteCertificate { get; protected set; }
-
-        public SslPolicyErrors RemotePolicyErrors { get; protected set; }
-
         /// <summary>
         ///     Build a new SSL steam.
         /// </summary>
         /// <returns>Stream which is ready to be used (must have been validated)</returns>
         public SslStream Build(Connection connection)
         {
-            var stream = new SslStream(connection.Client.GetStream(), true, OnRemoteCertificateValidation, OnCertificateSelection);
-
+            connection.SslCertificates = new SslCertificatePair { Certificate = Certificate };
+            var stream = new SslStream(connection.Client.GetStream(), true,
+                (s, cert, chain, err) => OnRemoteCertificateValidation(connection, cert, chain, err), OnCertificateSelection);
+            
             try
             {
                 X509CertificateCollection certificates = null;
@@ -94,11 +92,11 @@ namespace Ace.Networking.MicroProtocol.SSL
         /// <param name="chain">The chain.</param>
         /// <param name="sslpolicyerrors">The sslpolicyerrors.</param>
         /// <returns><c>true</c> if the certificate will be allowed, otherwise <c>false</c>.</returns>
-        protected virtual bool OnRemoteCertificateValidation(object sender, X509Certificate certificate, X509Chain chain,
+        protected virtual bool OnRemoteCertificateValidation(Connection sender, X509Certificate certificate, X509Chain chain,
             SslPolicyErrors sslpolicyerrors)
         {
-            RemoteCertificate = new BasicCertificateInfo(certificate);
-            RemotePolicyErrors = sslpolicyerrors;
+            sender.SslCertificates.RemoteCertificate = new BasicCertificateInfo(certificate);
+            sender.SslCertificates.RemotePolicyErrors = sslpolicyerrors;
             return sslpolicyerrors == SslPolicyErrors.None;
             //return (Certificate != null && certificate == null) || (Certificate == null && certificate != null);
         }
