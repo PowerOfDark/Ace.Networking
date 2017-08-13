@@ -129,40 +129,13 @@ namespace Ace.Networking
             return (TResponse) res;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Task EnqueueSendContent<T>(this Connection connection, T payload)
-        {
-            return connection.EnqueueSendPacket(new PreparedPacket<ContentHeader, T>(new ContentHeader(), payload));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static Task EnqueueSend<T>(this Connection connection, T payload)
-        {
-            if (payload is IPreparedPacket p)
-            {
-                return connection.EnqueueSendPacket(p);
-            }
-            return EnqueueSendContent(connection, payload);
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Task Send<T>(this Connection connection, T payload)
         {
-            return EnqueueSendContent(connection, payload);
+            return connection.EnqueueSendContent(payload);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static Task EnqueueSendResponse<T>(this Connection connection, int requestId, T response)
-        {
-            return connection.EnqueueSendPacket(new TrackablePacket<T>(new TrackableHeader(requestId, PacketFlag.IsResponse),
-                response));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static Task EnqueueSendResponse<T>(this Connection connection, TrackableHeader requestHeader, T response)
-        {
-            return EnqueueSendResponse(connection, requestHeader.RequestId, response);
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Task EnqueueSendRaw(this Connection connection, int bufId, int seq, byte[] buf, int count = -1)

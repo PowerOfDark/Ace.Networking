@@ -13,6 +13,7 @@ using Ace.Networking.Interfaces;
 using Ace.Networking.MicroProtocol.Enums;
 using Ace.Networking.MicroProtocol.Headers;
 using Ace.Networking.MicroProtocol.Interfaces;
+using Ace.Networking.MicroProtocol.PacketTypes;
 using Ace.Networking.MicroProtocol.SSL;
 using Ace.Networking.MicroProtocol.Structures;
 using Ace.Networking.Structures;
@@ -54,8 +55,7 @@ namespace Ace.Networking
         internal readonly ConcurrentDictionary<Type, LinkedList<TaskCompletionSource<object>>> _receiveTypeFilters =
             new ConcurrentDictionary<Type, LinkedList<TaskCompletionSource<object>>>();
 
-        internal readonly ConcurrentDictionary<Type, Queue<TaskCompletionSource<RequestWrapper>>>
-            _requestHandlers =
+        internal readonly ConcurrentDictionary<Type, Queue<TaskCompletionSource<RequestWrapper>>> _requestHandlers =
                 new ConcurrentDictionary<Type, Queue<TaskCompletionSource<RequestWrapper>>>();
 
         internal readonly ConcurrentDictionary<int, TaskCompletionSource<object>> _responseHandlers =
@@ -611,6 +611,35 @@ namespace Ace.Networking
                 _sendWorkerWaitHandle.Set();
             }
             return tcs.Task;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task EnqueueSendContent<T>(T payload)
+        {
+            return EnqueueSendPacket(new PreparedPacket<ContentHeader, T>(new ContentHeader(), payload));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal Task EnqueueSendResponse<T>(int requestId, T response)
+        {
+            return EnqueueSendPacket(new TrackablePacket<T>(new TrackableHeader(requestId, PacketFlag.IsResponse),
+                response));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal Task EnqueueSendResponse<T>(TrackableHeader requestHeader, T response)
+        {
+            return EnqueueSendResponse(requestHeader.RequestId, response);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static Task EnqueueSend<T>(this Connection connection, T payload)
+        {
+            if (payload is IPreparedPacket p)
+            {
+                return connection.EnqueueSendPacket(p);
+            }
+            return connection.EnqueueSendContent(payload);
         }
 
         public void Close()
