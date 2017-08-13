@@ -633,13 +633,13 @@ namespace Ace.Networking
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static Task EnqueueSend<T>(this Connection connection, T payload)
+        internal Task EnqueueSend<T>(T payload)
         {
             if (payload is IPreparedPacket p)
             {
-                return connection.EnqueueSendPacket(p);
+                return EnqueueSendPacket(p);
             }
-            return connection.EnqueueSendContent(payload);
+            return EnqueueSendContent(payload);
         }
 
         public void Close()
