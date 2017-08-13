@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard1.6</TargetFrameworks>
+    <TargetFrameworks>netstandard1.3</TargetFrameworks>
     <DefineConstants Condition=" '$(TargetFramework)' == 'netcoreapp1.1' ">CORE</DefineConstants>
   </PropertyGroup>
 
