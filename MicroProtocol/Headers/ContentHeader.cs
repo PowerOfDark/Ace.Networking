@@ -11,7 +11,7 @@ namespace Ace.Networking.MicroProtocol.Headers
 
         public byte[] ContentType { get; set; }
 
-        public ushort ContentTypeLength => checked((ushort)(ContentType?.Length ?? 0));
+        public ushort ContentTypeLength => checked((ushort) (ContentType?.Length ?? 0));
 
         public int ContentLength { get; set; }
 
@@ -35,7 +35,7 @@ namespace Ace.Networking.MicroProtocol.Headers
         public override void Serialize(byte[] target, int offset = 0)
         {
             base.Serialize(target, offset);
-            BitConverter2.GetBytes((short)ContentTypeLength, target, offset + Position);
+            BitConverter2.GetBytes((short) ContentTypeLength, target, offset + Position);
             Position += sizeof(ushort);
             //Encoding.ASCII.GetBytes(ContentType, 0, ContentTypeLength, target, offset + Position); Position += ContentTypeLength;
             for (var i = 0; i < ContentTypeLength; i++)

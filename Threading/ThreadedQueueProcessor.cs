@@ -101,9 +101,12 @@ namespace Ace.Networking.Threading
         {
             _timer?.Dispose();
             var tmp = ThreadList.ToList();
-            ThreadList.Clear();// crash every enqueue attempt
-            while (_pending != 0) Thread.Sleep(2);
-            for (int i = 0; i < ThreadCount; i++)
+            ThreadList.Clear(); // crash every enqueue attempt
+            while (_pending != 0)
+            {
+                Thread.Sleep(2);
+            }
+            for (var i = 0; i < ThreadCount; i++)
             {
                 tmp[i].Run = false;
                 tmp[i].WaitHandle.Set();
@@ -391,7 +394,7 @@ namespace Ace.Networking.Threading
 
         protected virtual void WorkWrapper(object state)
         {
-            var st = (ThreadData)state;
+            var st = (ThreadData) state;
             if (st.Id == 0)
             {
                 WorkMain(st);

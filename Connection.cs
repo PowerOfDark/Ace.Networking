@@ -56,7 +56,7 @@ namespace Ace.Networking
             new ConcurrentDictionary<Type, LinkedList<TaskCompletionSource<object>>>();
 
         internal readonly ConcurrentDictionary<Type, Queue<TaskCompletionSource<RequestWrapper>>> _requestHandlers =
-                new ConcurrentDictionary<Type, Queue<TaskCompletionSource<RequestWrapper>>>();
+            new ConcurrentDictionary<Type, Queue<TaskCompletionSource<RequestWrapper>>>();
 
         internal readonly ConcurrentDictionary<int, TaskCompletionSource<object>> _responseHandlers =
             new ConcurrentDictionary<int, TaskCompletionSource<object>>();
@@ -290,11 +290,11 @@ namespace Ace.Networking
                 }
                 if (unboxedRequest.HasValue)
                 {
-                    this.EnqueueSendResponse(((TrackableHeader) header).RequestId, o);
+                    EnqueueSendResponse(((TrackableHeader) header).RequestId, o);
                 }
                 else
                 {
-                    this.EnqueueSend(o);
+                    EnqueueSend(o);
                 }
             }
 
@@ -388,7 +388,7 @@ namespace Ace.Networking
                 {
                     return;
                 }
-                this.EnqueueSend(o);
+                EnqueueSend(o);
             }
 
             if (_rawDataHandlers.Count > 0)

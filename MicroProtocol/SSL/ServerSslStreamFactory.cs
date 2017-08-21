@@ -32,10 +32,16 @@ namespace Ace.Networking.MicroProtocol.SSL
         /// </summary>
         public bool UseClientCertificate { get; set; }
 
+        /// <summary>
+        ///     Certificate to use in this server.
+        /// </summary>
+        public X509Certificate Certificate { get; }
+
         public SslStream Build(Connection connection)
         {
-            connection.SslCertificates = new SslCertificatePair { Certificate = Certificate };
-            var stream = new SslStream(connection.Client.GetStream(), true, (s, cert, chain, err) => OnRemoteCertificateValidation(connection, cert, chain, err));
+            connection.SslCertificates = new SslCertificatePair {Certificate = Certificate};
+            var stream = new SslStream(connection.Client.GetStream(), true,
+                (s, cert, chain, err) => OnRemoteCertificateValidation(connection, cert, chain, err));
 
             try
             {
@@ -58,11 +64,6 @@ namespace Ace.Networking.MicroProtocol.SSL
 
             return stream;
         }
-
-        /// <summary>
-        ///     Certificate to use in this server.
-        /// </summary>
-        public X509Certificate Certificate { get; }
 
 
         protected virtual bool OnRemoteCertificateValidation(Connection sender, X509Certificate certificate, X509Chain chain,

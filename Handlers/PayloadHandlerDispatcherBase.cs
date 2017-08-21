@@ -16,10 +16,10 @@ namespace Ace.Networking.Handlers
 
         public delegate void RequestHandler(RequestWrapper request);
 
+        protected ConcurrentDictionary<Type, RequestHandler> RequestHandlers = new ConcurrentDictionary<Type, RequestHandler>();
+
         protected ConcurrentDictionary<Type, LinkedList<IPayloadHandlerWrapper>> TypeHandlers =
             new ConcurrentDictionary<Type, LinkedList<IPayloadHandlerWrapper>>();
-
-        protected ConcurrentDictionary<Type, RequestHandler> RequestHandlers = new ConcurrentDictionary<Type, RequestHandler>();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void AppendTypeHandler(Type type, IPayloadHandlerWrapper handler)

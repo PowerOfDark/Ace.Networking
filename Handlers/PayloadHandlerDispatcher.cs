@@ -78,7 +78,7 @@ namespace Ace.Networking.Handlers
         }
 
         /// <summary>
-        /// WARNING: This function overwrites the specified request handler
+        ///     WARNING: This function overwrites the specified request handler
         /// </summary>
         public void OnRequest(Type type, RequestHandler handler)
         {
@@ -88,12 +88,14 @@ namespace Ace.Networking.Handlers
                 {
                     RequestHandlers[type] = handler;
                 }
-                catch { }
+                catch
+                {
+                }
             }
         }
 
         /// <summary>
-        /// WARNING: This function overwrites the specified request handler
+        ///     WARNING: This function overwrites the specified request handler
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void OnRequest<T>(RequestHandler handler)
@@ -102,18 +104,20 @@ namespace Ace.Networking.Handlers
         }
 
         /// <summary>
-        /// Returns the current request handler for the specified type, or null if doesn't exist
+        ///     Returns the current request handler for the specified type, or null if doesn't exist
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public RequestHandler OnRequest(Type type)
         {
             if (RequestHandlers.TryGetValue(type, out var handler))
+            {
                 return handler;
+            }
             return null;
         }
 
         /// <summary>
-        /// Returns the current request handler for the specified type, or null if doesn't exist
+        ///     Returns the current request handler for the specified type, or null if doesn't exist
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public RequestHandler OnRequest<T>()
@@ -168,10 +172,11 @@ namespace Ace.Networking.Handlers
                     {
                         handler?.Invoke(new RequestWrapper(connection, requestId.Value, obj));
                     }
-                    catch { }
+                    catch
+                    {
+                    }
                 }
             }
-
         }
     }
 }

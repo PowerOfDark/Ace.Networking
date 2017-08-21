@@ -32,7 +32,7 @@ namespace Ace.Networking.MicroProtocol
         private bool _disposeBodyStream = true;
 
         /// <summary>
-        ///     Initializes a new instance of the <see cref="MicroMessageEncoder" /> class.
+        ///     Initializes a new instance of the <see cref="MicroEncoder" /> class.
         /// </summary>
         /// <param name="serializer">
         ///     Serializer used to serialize the messages that should be sent.
@@ -44,7 +44,7 @@ namespace Ace.Networking.MicroProtocol
         }
 
         /// <summary>
-        ///     Initializes a new instance of the <see cref="MicroMessageEncoder" /> class.
+        ///     Initializes a new instance of the <see cref="MicroEncoder" /> class.
         /// </summary>
         /// <param name="serializer">
         ///     Serializer used to serialize the messages that should be sent.
@@ -254,9 +254,12 @@ namespace Ace.Networking.MicroProtocol
 
             var sliceOffset = _bufferSlice.Offset;
             var sliceBuffer = _bufferSlice.Buffer;
-            _headerSize = 1 + 2; //
-            sliceBuffer[sliceOffset + 2] = Version;
-            _header.Serialize(_bufferSlice.Buffer, sliceOffset + 3);
+
+
+            const int baseHeaderSize = /* header length */ sizeof(short) + /* encoder version */ sizeof(byte);
+            _headerSize = baseHeaderSize; //
+            sliceBuffer[sliceOffset + sizeof(short)] = Version;
+            _header.Serialize(_bufferSlice.Buffer, sliceOffset + _headerSize);
             _headerSize += _header.Position;
             if (_headerSize > ushort.MaxValue)
             {

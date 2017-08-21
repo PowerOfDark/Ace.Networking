@@ -46,10 +46,10 @@ namespace Ace.Networking.MicroProtocol.SSL
         /// <returns>Stream which is ready to be used (must have been validated)</returns>
         public SslStream Build(Connection connection)
         {
-            connection.SslCertificates = new SslCertificatePair { Certificate = Certificate };
+            connection.SslCertificates = new SslCertificatePair {Certificate = Certificate};
             var stream = new SslStream(connection.Client.GetStream(), true,
                 (s, cert, chain, err) => OnRemoteCertificateValidation(connection, cert, chain, err), OnCertificateSelection);
-            
+
             try
             {
                 X509CertificateCollection certificates = null;

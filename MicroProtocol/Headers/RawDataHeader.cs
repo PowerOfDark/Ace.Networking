@@ -8,7 +8,8 @@ namespace Ace.Networking.MicroProtocol.Headers
     {
         public delegate object RawDataHandler(int bufferId, int seq, Stream stream);
 
-        public RawDataHeader(int rawDataBufferId, int rawDataSeq, int byteCount = -1, bool disposeStreamAfterSend = true) : base(PacketType.RawData)
+        public RawDataHeader(int rawDataBufferId, int rawDataSeq, int byteCount = -1, bool disposeStreamAfterSend = true) : base(PacketType
+            .RawData)
         {
             RawDataBufferId = rawDataBufferId;
             RawDataSeq = rawDataSeq;

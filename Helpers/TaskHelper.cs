@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,7 +14,7 @@ namespace Ace.Networking.Helpers
                 var cts = new CancellationTokenSource(timeout.Value);
                 cts.Token.Register(t =>
                 {
-                    var task = (TaskCompletionSource<T>)t;
+                    var task = (TaskCompletionSource<T>) t;
                     task.TrySetCanceled();
                 }, tcs);
             }

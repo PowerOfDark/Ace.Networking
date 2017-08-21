@@ -8,7 +8,7 @@ namespace Ace.Networking.MicroProtocol.Interfaces
     {
         X509Certificate Certificate { get; }
 
-        BasicCertificateInfo RemoteCertificate { get;}
+        BasicCertificateInfo RemoteCertificate { get; }
         SslPolicyErrors RemotePolicyErrors { get; }
     }
 }
