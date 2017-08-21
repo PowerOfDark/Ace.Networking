@@ -31,7 +31,6 @@ namespace Ace.Networking.ProtoBuf
         public void Serialize(object source, Stream destination, out byte[] contentType)
         {
             Serializer.NonGeneric.Serialize(destination, source);
-            //contentType = "application/protobuf;" + source.GetType().FullName;
             var type = source.GetType();
             contentType = CreateContentType(type);
         }

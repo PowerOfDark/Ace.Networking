@@ -25,11 +25,11 @@ namespace Ace.Networking.MicroProtocol
         private int _bytesEnqueued;
         private int _bytesLeftToSend;
         private int _bytesTransferred;
+        private bool _disposeBodyStream = true;
         private BasicHeader _header;
         private bool _headerIsSent;
         private int _headerSize;
         private object _message;
-        private bool _disposeBodyStream = true;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="MicroEncoder" /> class.
@@ -121,7 +121,7 @@ namespace Ace.Networking.MicroProtocol
             if (!_headerIsSent)
             {
                 var headerLength = CreateHeader(out int streamLen);
-                var bytesToWrite = (int)Math.Min(_bufferSlice.Capacity - headerLength, streamLen);
+                var bytesToWrite = Math.Min(_bufferSlice.Capacity - headerLength, streamLen);
                 _bodyStream.Read(_bufferSlice.Buffer, _bufferSlice.Offset + headerLength, bytesToWrite);
                 args.SetBuffer(_bufferSlice.Buffer, _bufferSlice.Offset, bytesToWrite + headerLength);
                 _bytesEnqueued = headerLength + bytesToWrite;
@@ -208,7 +208,7 @@ namespace Ace.Networking.MicroProtocol
             {
                 if (_message is Stream)
                 {
-                    _bodyStream = (Stream)_message;
+                    _bodyStream = (Stream) _message;
                     content.ContentType = _serializer.CreateContentType(typeof(Stream));
                 }
                 else if (_message is byte[] buf)
@@ -235,7 +235,7 @@ namespace Ace.Networking.MicroProtocol
                     content.ContentType = contentType;
                     _bodyStream.Position = 0;
                 }
-                contentLength = content.ContentLength = (int)(_bodyStream.Length - _bodyStream.Position);
+                contentLength = content.ContentLength = checked((int) (_bodyStream.Length - _bodyStream.Position));
                 if (content.ContentLength == 0)
                 {
                     content.PacketFlag |= PacketFlag.NoContent;
@@ -243,10 +243,10 @@ namespace Ace.Networking.MicroProtocol
             }
             else if (_header is RawDataHeader raw)
             {
-                _bodyStream = (Stream)_message;
+                _bodyStream = (Stream) _message;
                 if (raw.ContentLength <= 0)
                 {
-                    raw.ContentLength = (int)(_bodyStream.Length - _bodyStream.Position);
+                    raw.ContentLength = checked((int) (_bodyStream.Length - _bodyStream.Position));
                 }
                 contentLength = raw.ContentLength;
                 _disposeBodyStream = raw.DisposeStreamAfterSend;
@@ -265,7 +265,7 @@ namespace Ace.Networking.MicroProtocol
             {
                 throw new InvalidDataException("Invalid header");
             }
-            BitConverter2.GetBytes((short)_headerSize, sliceBuffer, sliceOffset);
+            BitConverter2.GetBytes((short) _headerSize, sliceBuffer, sliceOffset);
 
             return _headerSize;
         }

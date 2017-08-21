@@ -1,18 +1,19 @@
 ﻿using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading;
 
 namespace Ace.Networking.Structures
 {
     public class BufferQueue<T>
     {
-        private readonly ConcurrentQueue<T> _container;
+        private readonly Queue<T> _container;
 
         private readonly AutoResetEvent _lock;
         //private object _enqueueSyncRoot;
 
         private BufferQueue()
         {
-            _container = new ConcurrentQueue<T>();
+            _container = new Queue<T>();
             _lock = new AutoResetEvent(false);
             //_enqueueSyncRoot = new object();
         }
@@ -34,7 +35,7 @@ namespace Ace.Networking.Structures
         /// <returns></returns>
         public void Enqueue(T item)
         {
-            //lock (_enqueueSyncRoot)
+            lock (_container)
             {
                 if (Count >= Barrier)
                 {
@@ -46,12 +47,20 @@ namespace Ace.Networking.Structures
 
         public bool TryDequeue(out T item)
         {
-            var res = _container.TryDequeue(out item);
-            if (res && Count == Barrier - 1)
+            lock (_container)
+            {
+                if (_container.Count == 0)
+                {
+                    item = default(T);
+                    return false;
+                }
+                item = _container.Dequeue();
+            }
+            if (Count == Barrier - 1)
             {
                 _lock.Set();
             }
-            return res;
+            return true;
         }
     }
 }

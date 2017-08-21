@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Ace.Networking.Handlers;
 using Ace.Networking.MicroProtocol.Enums;
 using Ace.Networking.MicroProtocol.Headers;
-using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.PacketTypes;
 
 namespace Ace.Networking
