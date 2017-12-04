@@ -3,6 +3,8 @@ using System.Security.Cryptography.X509Certificates;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.SSL;
 using Ace.Networking.Threading;
+using System.Reflection;
+using Ace.Networking.ProtoBuf;
 
 namespace Ace.Networking
 {
@@ -23,6 +25,10 @@ namespace Ace.Networking
 
         protected ProtocolConfiguration()
         {
+            var serializer = new GuidProtoBufSerializer();
+            PayloadEncoder = new MicroProtocol.MicroEncoder(serializer.Clone());
+            PayloadDecoder = new MicroProtocol.MicroDecoder(serializer.Clone());
+            Initialize();
         }
 
         public IPayloadEncoder PayloadEncoder { get; protected set; }
@@ -41,6 +47,17 @@ namespace Ace.Networking
                 return;
             }
             IsInitialized = true;
+
+            if(PayloadEncoder.Serializer is GuidProtoBufSerializer || PayloadDecoder.Serializer is GuidProtoBufSerializer)
+            {
+                GuidProtoBufSerializer.RegisterAssembly(this.GetType().GetTypeInfo().Assembly);
+            }
+
+            if (PayloadEncoder.Serializer is ProtoBufSerializer || PayloadDecoder.Serializer is ProtoBufSerializer)
+            {
+                ProtoBufSerializer.RegisterAssembly(this.GetType().GetTypeInfo().Assembly);
+            }
+
         }
 
         public virtual ClientSslStreamFactory GetClientSslFactory(string targetCommonName = "",

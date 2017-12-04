@@ -7,6 +7,7 @@ namespace Ace.Networking.MicroProtocol.Interfaces
 {
     public interface IPayloadDecoder
     {
+        IPayloadSerializer Serializer { get; }
         /// <summary>
         ///     A message has been received.
         /// </summary>

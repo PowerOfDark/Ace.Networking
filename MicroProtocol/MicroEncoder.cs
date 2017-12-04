@@ -20,7 +20,7 @@ namespace Ace.Networking.MicroProtocol
         private readonly IBufferSlice _bufferSlice;
 
         private readonly MemoryStream _internalStream = new MemoryStream();
-        private readonly IPayloadSerializer _serializer;
+        public IPayloadSerializer Serializer { get; private set; }
         private Stream _bodyStream;
         private int _bytesEnqueued;
         private int _bytesLeftToSend;
@@ -39,7 +39,7 @@ namespace Ace.Networking.MicroProtocol
         /// </param>
         public MicroEncoder(IPayloadSerializer serializer)
         {
-            _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+            Serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
             _bufferSlice = new BufferSlice(new byte[65535], 0, 65535);
         }
 
@@ -66,7 +66,7 @@ namespace Ace.Networking.MicroProtocol
             }
 
 
-            _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+            Serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
             _bufferSlice = bufferSlice;
         }
 
@@ -198,7 +198,7 @@ namespace Ace.Networking.MicroProtocol
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IPayloadEncoder Clone()
         {
-            return new MicroEncoder(_serializer.Clone());
+            return new MicroEncoder(Serializer.Clone());
         }
 
         private int CreateHeader(out int contentLength)
@@ -209,22 +209,22 @@ namespace Ace.Networking.MicroProtocol
                 if (_message is Stream)
                 {
                     _bodyStream = (Stream) _message;
-                    content.ContentType = _serializer.CreateContentType(typeof(Stream));
+                    content.ContentType = Serializer.CreateContentType(typeof(Stream));
                 }
                 else if (_message is byte[] buf)
                 {
                     _bodyStream = new MemoryStream(buf);
                     _bodyStream.SetLength(buf.Length);
-                    content.ContentType = _serializer.CreateContentType(typeof(byte[]));
+                    content.ContentType = Serializer.CreateContentType(typeof(byte[]));
                     _disposeBodyStream = true;
                 }
                 else
                 {
                     _bodyStream = _internalStream;
-                    _serializer.Serialize(_message, _bodyStream, out byte[] contentType);
+                    Serializer.Serialize(_message, _bodyStream, out byte[] contentType);
                     if (contentType == null)
                     {
-                        contentType = _serializer.CreateContentType(_message.GetType());
+                        contentType = Serializer.CreateContentType(_message.GetType());
                     }
                     if (contentType.Length > 2048)
                     {

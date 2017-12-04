@@ -19,7 +19,7 @@ namespace Ace.Networking.MicroProtocol
         private readonly MemoryStream _contentStream = new MemoryStream();
         private readonly byte[] _header = new byte[short.MaxValue];
 
-        private readonly IPayloadSerializer _serializer;
+        public IPayloadSerializer Serializer { get; private set; }
 
         private int _bytesLeftForCurrentState;
         private int _bytesLeftInSocketBuffer;
@@ -40,7 +40,7 @@ namespace Ace.Networking.MicroProtocol
         /// <exception cref="System.ArgumentNullException">serializer</exception>
         public MicroDecoder(IPayloadSerializer serializer)
         {
-            _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+            Serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
             _bytesLeftForCurrentState = sizeof(short);
             _stateMethod = ReadHeaderLength;
         }
@@ -113,7 +113,7 @@ namespace Ace.Networking.MicroProtocol
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IPayloadDecoder Clone()
         {
-            return new MicroDecoder(_serializer.Clone());
+            return new MicroDecoder(Serializer.Clone());
         }
 
         private bool ReadHeaderLength(SocketBuffer e)
@@ -220,7 +220,7 @@ namespace Ace.Networking.MicroProtocol
             {
                 var contentType = content.ContentType;
                 var packet = new DefaultContentPacket(content, null);
-                var message = _serializer.Deserialize(contentType, _contentStream, out Type resolvedType);
+                var message = Serializer.Deserialize(contentType, _contentStream, out Type resolvedType);
                 packet.Payload = message;
                 packet.Type = resolvedType;
 

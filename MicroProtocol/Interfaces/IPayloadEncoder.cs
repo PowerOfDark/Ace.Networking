@@ -6,6 +6,8 @@ namespace Ace.Networking.MicroProtocol.Interfaces
 {
     public interface IPayloadEncoder
     {
+        IPayloadSerializer Serializer { get; }
+
         void Prepare(BasicHeader header, object message);
 
         void PrepareRaw(RawDataPacket rawData);
