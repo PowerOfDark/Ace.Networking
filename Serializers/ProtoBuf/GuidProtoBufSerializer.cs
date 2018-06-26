@@ -43,12 +43,25 @@ namespace Ace.Networking.ProtoBuf
             return Serializer.NonGeneric.Deserialize(resolvedType, source);
         }
 
+        public object DeserializeType(Type type, Stream source)
+        {
+            return Serializer.NonGeneric.Deserialize(type, source);
+        }
+
         public void Serialize(object source, Stream destination, out byte[] contentType)
         {
             var type = source.GetType();
+           
             contentType = CreateContentType(type);
             Serializer.NonGeneric.Serialize(destination, source);
         }
+
+        public void Serialize(object source, Stream destination)
+        {
+            var type = source.GetType();
+            Serializer.NonGeneric.Serialize(destination, source);
+        }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsValidContentType(byte[] contentType)
@@ -68,7 +81,7 @@ namespace Ace.Networking.ProtoBuf
             return CreateContentTypeStatic(type);
         }
 
-        public static void RegisterAssembly(Assembly assembly)
+        public void RegisterAssembly(Assembly assembly)
         {
             var protoAttribute = typeof(ProtoContractAttribute);
             var types = assembly.GetTypes().Where(t => t.GetTypeInfo().GetCustomAttribute(protoAttribute) != null);
@@ -99,5 +112,7 @@ namespace Ace.Networking.ProtoBuf
 
             return b;
         }
+
+
     }
 }

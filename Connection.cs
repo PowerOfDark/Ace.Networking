@@ -22,7 +22,7 @@ using static Ace.Networking.MicroProtocol.Headers.RawDataHeader;
 
 namespace Ace.Networking
 {
-    public sealed class Connection : PayloadHandlerDispatcher, IDisposable
+    public sealed class Connection : PayloadHandlerDispatcher, IDisposable, IConnection
     {
         public delegate void DisconnectHandler(Connection connection, Exception exception);
 
@@ -36,9 +36,9 @@ namespace Ace.Networking
         internal readonly SemaphoreSlim _closeEvent = new SemaphoreSlim(0, 1);
 
         internal readonly IPayloadDecoder _decoder;
-
-
         internal readonly IPayloadEncoder _encoder;
+
+        public IPayloadSerializer Serializer => _encoder?.Serializer ?? _decoder?.Serializer;
 
         internal readonly ConcurrentDictionary<int, LinkedList<RawDataHandler>> _rawDataHandlers =
             new ConcurrentDictionary<int, LinkedList<RawDataHandler>>();
@@ -620,7 +620,7 @@ namespace Ace.Networking
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal Task EnqueueSendResponse<T>(int requestId, T response)
+        public Task EnqueueSendResponse<T>(int requestId, T response)
         {
             return EnqueueSendPacket(new TrackablePacket<T>(new TrackableHeader(requestId, PacketFlag.IsResponse),
                 response));
@@ -641,6 +641,151 @@ namespace Ace.Networking
             }
             return EnqueueSendContent(payload);
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task Send<T>(T payload)
+        {
+            return EnqueueSendContent(payload);
+        }
+
+        /// <summary>
+        ///     Returns the first packet for which <b>filter</b> yields true
+        /// </summary>
+        /// <param name="filter"></param>
+        /// <param name="timeout"></param>
+        /// <returns></returns>
+        public Task<object> Receive(Connection.PayloadFilter filter, CancellationToken? token = null)
+        {
+            var tcs = new TaskCompletionSource<object>(filter);
+
+            lock (_receiveFiltersLock)
+            {
+                _receiveFilters.AddLast(tcs);
+            }
+
+            token?.Register(t => ((TaskCompletionSource<object>)t).TrySetCanceled(), tcs);
+            return tcs.Task;
+        }
+
+
+
+        public async Task<T> Receive<T>(CancellationToken? token = null)
+        {
+            var tcs = new TaskCompletionSource<object>();
+            if (!_receiveTypeFilters.TryAddLast(typeof(T), tcs))
+            {
+                throw new InvalidOperationException();
+            }
+
+            token?.Register(t => ((TaskCompletionSource<object>)t).TrySetCanceled(), tcs);
+            
+            return (T)await tcs.Task;
+        }
+
+
+        public Task<object> SendReceive<TSend>(TSend obj, Connection.PayloadFilter filter,
+            CancellationToken? token = null)
+        {
+            var res = Receive(filter, token);
+            Send(obj);
+            return res;
+        }
+
+
+        public Task<TReceive> SendReceive<TSend, TReceive>(TSend obj, CancellationToken? token = null)
+        {
+            var res = Receive<TReceive>(token);
+            Send(obj);
+            return res;
+        }
+
+        public Task<object> SendRequest<TRequest>(TRequest req, CancellationToken? token = null)
+        {
+            var id = Interlocked.Increment(ref Connection._lastRequestId);
+            var tcs = new TaskCompletionSource<object>(id);
+
+            if (!_responseHandlers.TryAdd(id, tcs))
+            {
+                throw new InvalidOperationException();
+            }
+
+           EnqueueSendPacket(new TrackablePacket<TRequest>(new TrackableHeader(id, PacketFlag.IsRequest), req));
+
+                token?.Register(t =>
+                {
+                    var task = (TaskCompletionSource<object>)t;
+                    task.TrySetCanceled();
+                    _responseHandlers.TryRemove((int)task.Task.AsyncState, out _);
+                }, tcs);
+            
+            return tcs.Task;
+        }
+
+        public Task<RequestWrapper> ReceiveRequest(Type type, CancellationToken? token = null)
+        {
+            var tcs = new TaskCompletionSource<RequestWrapper>();
+
+            if (!_requestHandlers.TryEnqueue(type, tcs))
+            {
+                throw new InvalidOperationException();
+            }
+
+                token?.Register(t => ((TaskCompletionSource<RequestWrapper>)t).TrySetCanceled(), tcs);
+            
+            return tcs.Task;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<RequestWrapper> ReceiveRequest<T>(CancellationToken? token = null)
+        {
+            return ReceiveRequest(typeof(T), token);
+        }
+
+        /// <summary>
+        /// </summary>
+        /// <typeparam name="TRequest">Request type</typeparam>
+        /// <typeparam name="TResponse">Response type</typeparam>
+        /// <param name="req"></param>
+        /// <param name="timeout"></param>
+        /// <returns>Return value of non-generic SendRequest casted to TResponse</returns>
+        public async Task<TResponse> SendRequest<TRequest, TResponse>(TRequest req,
+            CancellationToken? token = null)
+        {
+            var res = await SendRequest<TRequest>(req, token);
+            return (TResponse)res;
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task EnqueueSendRaw(int bufId, int seq, byte[] buf, int count = -1)
+        {
+            return EnqueueSendPacket(new RawDataPacket(new RawDataHeader(bufId, seq), buf, count));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task EnqueueSendRaw(int bufId, byte[] buf, int count = -1)
+        {
+            return EnqueueSendRaw(bufId, 0, buf, count);
+        }
+
+        /// <summary>
+        ///     WARNING: This function uses the specified Stream to stream data.
+        ///     If <paramref name="disposeAfterSend" /> is true, the Stream will be disposed after the send operation is completed.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task EnqueueSendRaw(int bufferId, int seq, Stream stream, int count = -1,
+            bool disposeAfterSend = true)
+        {
+            return EnqueueSendPacket(new RawDataPacket(new RawDataHeader(bufferId, seq, count, disposeAfterSend), stream));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task EnqueueSendRaw(int bufferId, Stream stream, int count = -1,
+            bool disposeAfterSend = true)
+        {
+            return EnqueueSendRaw(bufferId, 0, stream, count, disposeAfterSend);
+        }
+
 
         public void Close()
         {

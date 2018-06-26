@@ -1,23 +1,23 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Ace.Networking.MicroProtocol.Interfaces;
+using Ace.Networking.ProtoBuf;
+using MessagePack;
 using ProtoBuf;
 
-namespace Ace.Networking.ProtoBuf
+namespace Ace.Networking.Serializers
 {
-    /// <summary>
-    ///     Allows you to use protobuf-net together with MicroMsg in the networking library.
-    /// </summary>
-    public class ProtoBufSerializer : IPayloadSerializer
+    public class MsgPackSerializer : IPayloadSerializer
     {
-        private static readonly ConcurrentDictionary<string, Type> Types = new ConcurrentDictionary<string, Type>();
+        private static readonly Dictionary<string, Type> Types = new Dictionary<string, Type>();
 
-        private static readonly byte[] ContentType = {0x13, 0x36};
+        private static readonly byte[] ContentType = {0x4F, 0x47};
 
         /// <summary>
         ///     Serialize an object to the stream.
@@ -30,9 +30,23 @@ namespace Ace.Networking.ProtoBuf
         /// </param>
         public void Serialize(object source, Stream destination, out byte[] contentType)
         {
-            Serializer.NonGeneric.Serialize(destination, source);
             var type = source.GetType();
             contentType = CreateContentType(type);
+            if (!Types.ContainsKey(type.FullName))
+                MessagePackSerializer.NonGeneric.Serialize(type, destination, source,
+                    MessagePack.Resolvers.ContractlessStandardResolver.Instance);
+            else
+                MessagePackSerializer.NonGeneric.Serialize(type, destination, source);
+        }
+
+        public void Serialize(object source, Stream destination)
+        {
+            var type = source.GetType();
+            if (!Types.ContainsKey(type.FullName))
+                MessagePackSerializer.NonGeneric.Serialize(type, destination, source,
+                    MessagePack.Resolvers.ContractlessStandardResolver.Instance);
+            else
+                MessagePackSerializer.NonGeneric.Serialize(type, destination, source);
         }
 
         /// <summary>
@@ -53,16 +67,29 @@ namespace Ace.Networking.ProtoBuf
             {
                 throw new NotSupportedException("Invalid decoder");
             }
-            var type = Encoding.ASCII.GetString(contentType, 2, contentType.Length - 2);
-            Types.TryGetValue(type, out resolvedType);
+
+            var type = Encoding.UTF8.GetString(contentType, 2, contentType.Length - 2);
+            if (!Types.TryGetValue(type, out resolvedType))
+            {
+                throw new InvalidCastException("Unknown type");
+            }
 
             return Serializer.NonGeneric.Deserialize(resolvedType, source);
+        }
+
+        public object DeserializeType(Type type, Stream source)
+        {
+            if (!Types.ContainsKey(type.FullName))
+                return MessagePackSerializer.NonGeneric.Deserialize(type, source,
+                    MessagePack.Resolvers.ContractlessStandardResolver.Instance);
+            else
+                return MessagePackSerializer.NonGeneric.Serialize(type, source);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IPayloadSerializer Clone()
         {
-            return new ProtoBufSerializer();
+            return new MsgPackSerializer();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -74,21 +101,25 @@ namespace Ace.Networking.ProtoBuf
         public byte[] CreateContentType(Type type)
         {
             var typeS = type.FullName;
-            var b = new byte[2 + typeS.Length];
+            var b = new byte[2 + Encoding.UTF8.GetByteCount(typeS)];
             b[0] = ContentType[0];
             b[1] = ContentType[1];
-            Encoding.ASCII.GetBytes(typeS, 0, typeS.Length, b, 2);
+            Encoding.UTF8.GetBytes(typeS, 0, typeS.Length, b, 2);
             return b;
         }
 
-        public static void RegisterAssembly(Assembly assembly)
+        public void RegisterAssembly(Assembly assembly)
         {
-            var types = assembly.GetTypes()
-                .Where(t => t.GetTypeInfo().GetCustomAttribute(typeof(ProtoContractAttribute)) != null);
-            foreach (var type in types)
+            lock (Types)
             {
-                Types.TryAdd(type.FullName, type);
+                var types = assembly.GetTypes()
+                    .Where(t => t.GetTypeInfo().GetCustomAttribute(typeof(MessagePackObjectAttribute)) != null);
+                foreach (var type in types)
+                {
+                    Types.Add(type.FullName, type);
+                }
             }
+
         }
     }
 }

@@ -1,10 +1,11 @@
 ﻿using System.Threading.Tasks;
+using Ace.Networking.Interfaces;
 
 namespace Ace.Networking.Handlers
 {
-    public class RequestWrapper
+    public class RequestWrapper : IRequestWrapper
     {
-        internal RequestWrapper(Connection connection, int id, object request)
+        internal RequestWrapper(IConnection connection, int id, object request)
         {
             Connection = connection;
             RequestId = id;
@@ -12,7 +13,7 @@ namespace Ace.Networking.Handlers
         }
 
         public object Request { get; }
-        public Connection Connection { get; }
+        public IConnection Connection { get; }
         internal int RequestId { get; }
 
         public Task SendResponse<T>(T response)

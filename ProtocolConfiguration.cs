@@ -5,6 +5,7 @@ using Ace.Networking.MicroProtocol.SSL;
 using Ace.Networking.Threading;
 using System.Reflection;
 using Ace.Networking.ProtoBuf;
+using Ace.Networking.Serializers;
 
 namespace Ace.Networking
 {
@@ -25,7 +26,7 @@ namespace Ace.Networking
 
         protected ProtocolConfiguration()
         {
-            var serializer = new GuidProtoBufSerializer();
+            var serializer = new MsgPackSerializer();
             PayloadEncoder = new MicroProtocol.MicroEncoder(serializer.Clone());
             PayloadDecoder = new MicroProtocol.MicroDecoder(serializer.Clone());
             Initialize();
@@ -48,14 +49,13 @@ namespace Ace.Networking
             }
             IsInitialized = true;
 
-            if(PayloadEncoder.Serializer is GuidProtoBufSerializer || PayloadDecoder.Serializer is GuidProtoBufSerializer)
-            {
-                GuidProtoBufSerializer.RegisterAssembly(this.GetType().GetTypeInfo().Assembly);
-            }
 
-            if (PayloadEncoder.Serializer is ProtoBufSerializer || PayloadDecoder.Serializer is ProtoBufSerializer)
+            PayloadEncoder.Serializer.RegisterAssembly(this.GetType().GetTypeInfo().Assembly);
+            PayloadEncoder.Serializer.RegisterAssembly(typeof(Connection).GetTypeInfo().Assembly);
+            if (PayloadEncoder.Serializer != PayloadDecoder.Serializer)
             {
-                ProtoBufSerializer.RegisterAssembly(this.GetType().GetTypeInfo().Assembly);
+                PayloadDecoder.Serializer.RegisterAssembly(this.GetType().GetTypeInfo().Assembly);
+                PayloadDecoder.Serializer.RegisterAssembly(typeof(Connection).GetTypeInfo().Assembly);
             }
 
         }

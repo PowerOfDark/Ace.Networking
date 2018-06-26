@@ -24,6 +24,14 @@ namespace Ace.Networking
             return false;
         }
 
+        public static void Append<TKey, TValue>(this IDictionary<TKey, LinkedList<TValue>> d, TKey key, TValue val)
+        {
+            LinkedList<TValue> list;
+            if (!d.TryGetValue(key, out list))
+                d[key] = list = new LinkedList<TValue>();
+            list.AddLast(val);
+        }
+
         public static Connection ToConnection(this TcpClient client, ProtocolConfiguration configuration,
             ISslStreamFactory ssl = null)
         {
