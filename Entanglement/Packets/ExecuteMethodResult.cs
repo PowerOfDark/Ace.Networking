@@ -14,7 +14,7 @@ namespace Ace.Networking.Entanglement.Packets
     public class ExecuteMethodResult
     {
         [Key(0)]
-        public RemoteException Exception { get; set; }
+        public RemoteExceptionAdapter ExceptionAdapter { get; set; }
         [Key(1)]
         public object Data { get; set; }
 

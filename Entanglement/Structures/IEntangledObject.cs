@@ -8,7 +8,7 @@ namespace Ace.Networking.Entanglement.Structures
 {
     public interface IEntangledObject : INotifyPropertyChanging
     {
-        Guid Eid { get; set; }
-        InterfaceDescriptor Descriptor { get; set; }
+        Guid Eid { get; }
+        InterfaceDescriptor Descriptor { get; }
     }
 }

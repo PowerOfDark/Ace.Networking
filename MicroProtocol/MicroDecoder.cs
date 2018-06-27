@@ -37,7 +37,7 @@ namespace Ace.Networking.MicroProtocol
         ///     Initializes a new instance of the <see cref="MicroDecoder" /> class.
         /// </summary>
         /// <param name="serializer">The serializer used to decode the payload</param>
-        /// <exception cref="System.ArgumentNullException">serializer</exception>
+        /// <exceptionAdapter cref="System.ArgumentNullException">serializer</exceptionAdapter>
         public MicroDecoder(IPayloadSerializer serializer)
         {
             Serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));

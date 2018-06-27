@@ -50,7 +50,7 @@ namespace Ace.Networking.ProtoBuf
         /// <returns>
         ///     Created object
         /// </returns>
-        /// <exception cref="System.NotSupportedException">Invalid content type</exception>
+        /// <exceptionAdapter cref="System.NotSupportedException">Invalid content type</exceptionAdapter>
         public object Deserialize(byte[] contentType, Stream source, out Type resolvedType)
         {
             if (!IsValidContentType(contentType))

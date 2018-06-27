@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,8 +6,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Ace.Networking.MicroProtocol.Interfaces;
-using Ace.Networking.ProtoBuf;
 using MessagePack;
+using MessagePack.Resolvers;
 using ProtoBuf;
 
 namespace Ace.Networking.Serializers
@@ -32,21 +31,15 @@ namespace Ace.Networking.Serializers
         {
             var type = source.GetType();
             contentType = CreateContentType(type);
-            //if (!Types.ContainsKey(type.FullName))
-                MessagePackSerializer.NonGeneric.Serialize(type, destination, source,
-                    MessagePack.Resolvers.ContractlessStandardResolver.Instance);
-            /*else
-                MessagePackSerializer.NonGeneric.Serialize(type, destination, source);*/
+            MessagePackSerializer.NonGeneric.Serialize(type, destination, source,
+                ContractlessStandardResolver.Instance);
         }
 
         public void Serialize(object source, Stream destination)
         {
             var type = source.GetType();
-            if (!Types.ContainsKey(type.FullName))
-                MessagePackSerializer.NonGeneric.Serialize(type, destination, source,
-                    MessagePack.Resolvers.ContractlessStandardResolver.Instance);
-            else
-                MessagePackSerializer.NonGeneric.Serialize(type, destination, source);
+            MessagePackSerializer.NonGeneric.Serialize(type, destination, source,
+                ContractlessStandardResolver.Instance);
         }
 
         /// <summary>
@@ -60,30 +53,21 @@ namespace Ace.Networking.Serializers
         /// <returns>
         ///     Created object
         /// </returns>
-        /// <exception cref="System.NotSupportedException">Invalid content type</exception>
+        /// <exceptionAdapter cref="System.NotSupportedException">Invalid content type</exceptionAdapter>
         public object Deserialize(byte[] contentType, Stream source, out Type resolvedType)
         {
-            if (!IsValidContentType(contentType))
-            {
-                throw new NotSupportedException("Invalid decoder");
-            }
+            if (!IsValidContentType(contentType)) throw new NotSupportedException("Invalid decoder");
 
             var type = Encoding.UTF8.GetString(contentType, 2, contentType.Length - 2);
-            if (!Types.TryGetValue(type, out resolvedType))
-            {
-                throw new InvalidCastException("Unknown type");
-            }
+            if (!Types.TryGetValue(type, out resolvedType)) throw new InvalidCastException("Unknown type");
 
             return Serializer.NonGeneric.Deserialize(resolvedType, source);
         }
 
         public object DeserializeType(Type type, Stream source)
         {
-            if (!Types.ContainsKey(type.FullName))
-                return MessagePackSerializer.NonGeneric.Deserialize(type, source,
-                    MessagePack.Resolvers.ContractlessStandardResolver.Instance);
-            else
-                return MessagePackSerializer.NonGeneric.Serialize(type, source);
+            return MessagePackSerializer.NonGeneric.Deserialize(type, source,
+                ContractlessStandardResolver.Instance);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -114,12 +98,8 @@ namespace Ace.Networking.Serializers
             {
                 var types = assembly.GetTypes()
                     .Where(t => t.GetTypeInfo().GetCustomAttribute(typeof(MessagePackObjectAttribute)) != null);
-                foreach (var type in types)
-                {
-                    Types.Add(type.FullName, type);
-                }
+                foreach (var type in types) Types.Add(type.FullName, type);
             }
-
         }
     }
 }

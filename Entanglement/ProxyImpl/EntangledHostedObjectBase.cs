@@ -14,6 +14,8 @@ namespace Ace.Networking.Entanglement.ProxyImpl
     {
         protected EntanglementProviderContext Context { get; }
 
+
+
         public EntangledHostedObjectBase(Guid eid, InterfaceDescriptor i)
         {
             Eid = eid;
@@ -29,7 +31,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             lock (Context)
             {
                 Context.Sender = req.Connection;
-                RemoteException exception = null;
+                RemoteExceptionAdapter exceptionAdapter = null;
                 Task task = null;
                 try
                 {
@@ -45,30 +47,30 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                 }
                 catch (Exception e)
                 {
-                    exception = new RemoteException("A remote task failed", e);
+                    exceptionAdapter = new RemoteExceptionAdapter("A remote task failed", e);
                 }
                 // HUGE HACK WARNING
                 // we need to somehow operate on Task<T>, where T is unknown at compile time
                 // yet it is possible to always cast it to Task, then by casting it to a dynamic object access the result
-                if (exception != null || task.IsCompleted)
+                if (exceptionAdapter != null || task.IsCompleted)
                 {
                     var res = new ExecuteMethodResult();
-                    if (exception != null || task.IsFaulted)
+                    if (exceptionAdapter != null || task.IsFaulted)
                     {
                         res.Data = null;
-                        res.Exception = exception ?? new RemoteException("A remote task failed", task.Exception);
+                        res.ExceptionAdapter = exceptionAdapter ?? new RemoteExceptionAdapter("A remote task failed", task.Exception);
                     }
 
                     //else the task is completed
                     else if (overload.RealReturnType == typeof(void))
                     {
-                        res.Exception = null;
+                        res.ExceptionAdapter = null;
                         res.Data = null;
                     }
                     else
                     {
                         res.Data = (object)((dynamic) task).Result;
-                        res.Exception = null;
+                        res.ExceptionAdapter = null;
                     }
 
                     req.SendResponse(res);
@@ -78,9 +80,9 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                 {
                     task.ContinueWith(t =>
                     {
-                        RemoteException ex = null;
-                        if (t.Exception != null) ex = new RemoteException("A remote task failed", t.Exception);
-                        req.SendResponse(new ExecuteMethodResult() {Data = null, Exception = ex});
+                        RemoteExceptionAdapter ex = null;
+                        if (t.Exception != null) ex = new RemoteExceptionAdapter("A remote task failed", t.Exception);
+                        req.SendResponse(new ExecuteMethodResult() {Data = null, ExceptionAdapter = ex});
                     });
                 }
                 else
@@ -91,11 +93,11 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                         if (t.Exception != null)
                         {
                             exe.Data = null;
-                            exe.Exception = new RemoteException("A remote task failed", t.Exception);
+                            exe.ExceptionAdapter = new RemoteExceptionAdapter("A remote task failed", t.Exception);
                         }
                         else
                         {
-                            exe.Exception = null;
+                            exe.ExceptionAdapter = null;
                             exe.Data = ((dynamic) t).Result;
                         }
 

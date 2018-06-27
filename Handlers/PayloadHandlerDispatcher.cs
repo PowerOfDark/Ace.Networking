@@ -160,7 +160,7 @@ namespace Ace.Networking.Handlers
                         // ignored
                     }
                     //TODO: Inconsistencies
-                    // An exception in one of the handlers breaks the chain
+                    // An exceptionAdapter in one of the handlers breaks the chain
                 }
             }
 
