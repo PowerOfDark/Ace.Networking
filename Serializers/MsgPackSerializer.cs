@@ -32,11 +32,11 @@ namespace Ace.Networking.Serializers
         {
             var type = source.GetType();
             contentType = CreateContentType(type);
-            if (!Types.ContainsKey(type.FullName))
+            //if (!Types.ContainsKey(type.FullName))
                 MessagePackSerializer.NonGeneric.Serialize(type, destination, source,
                     MessagePack.Resolvers.ContractlessStandardResolver.Instance);
-            else
-                MessagePackSerializer.NonGeneric.Serialize(type, destination, source);
+            /*else
+                MessagePackSerializer.NonGeneric.Serialize(type, destination, source);*/
         }
 
         public void Serialize(object source, Stream destination)
