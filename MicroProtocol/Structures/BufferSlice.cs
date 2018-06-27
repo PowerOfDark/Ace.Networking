@@ -11,8 +11,8 @@ namespace Ace.Networking.MicroProtocol.Structures
         /// <param name="buffer">The buffer.</param>
         /// <param name="offset">Start offset in buffer.</param>
         /// <param name="count">Number of bytes allocated for this slice..</param>
-        /// <exceptionAdapter cref="System.ArgumentNullException">buffer</exceptionAdapter>
-        /// <exceptionAdapter cref="System.ArgumentOutOfRangeException">offset;Offset+Count must be less than the buffer length.</exceptionAdapter>
+        /// <exception cref="System.ArgumentNullException">buffer</exception>
+        /// <exception cref="System.ArgumentOutOfRangeException">offset;Offset+Count must be less than the buffer length.</exception>
         public BufferSlice(byte[] buffer, int offset, int count)
         {
             if (buffer == null)

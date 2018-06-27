@@ -53,7 +53,7 @@ namespace Ace.Networking.Serializers
         /// <returns>
         ///     Created object
         /// </returns>
-        /// <exceptionAdapter cref="System.NotSupportedException">Invalid content type</exceptionAdapter>
+        /// <exception cref="System.NotSupportedException">Invalid content type</exception>
         public object Deserialize(byte[] contentType, Stream source, out Type resolvedType)
         {
             if (!IsValidContentType(contentType)) throw new NotSupportedException("Invalid decoder");

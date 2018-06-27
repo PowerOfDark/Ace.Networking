@@ -31,7 +31,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             lock (Context)
             {
                 Context.Sender = req.Connection;
-                RemoteExceptionAdapter exceptionAdapter = null;
+                RemoteExceptionAdapter exception = null;
                 Task task = null;
                 try
                 {
@@ -47,18 +47,18 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                 }
                 catch (Exception e)
                 {
-                    exceptionAdapter = new RemoteExceptionAdapter("A remote task failed", e);
+                    exception = new RemoteExceptionAdapter("A remote task failed", e);
                 }
                 // HUGE HACK WARNING
                 // we need to somehow operate on Task<T>, where T is unknown at compile time
                 // yet it is possible to always cast it to Task, then by casting it to a dynamic object access the result
-                if (exceptionAdapter != null || task.IsCompleted)
+                if (exception != null || task.IsCompleted)
                 {
                     var res = new ExecuteMethodResult();
-                    if (exceptionAdapter != null || task.IsFaulted)
+                    if (exception != null || task.IsFaulted)
                     {
                         res.Data = null;
-                        res.ExceptionAdapter = exceptionAdapter ?? new RemoteExceptionAdapter("A remote task failed", task.Exception);
+                        res.ExceptionAdapter = exception ?? new RemoteExceptionAdapter("A remote task failed", task.Exception);
                     }
 
                     //else the task is completed

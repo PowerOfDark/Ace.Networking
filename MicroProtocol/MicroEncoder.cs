@@ -50,9 +50,9 @@ namespace Ace.Networking.MicroProtocol
         ///     Serializer used to serialize the messages that should be sent.
         /// </param>
         /// <param name="bufferSlice">Used when sending information.</param>
-        /// <exceptionAdapter cref="ArgumentOutOfRangeException">
+        /// <exception cref="ArgumentOutOfRangeException">
         ///     bufferSlice; At least the header should fit in the buffer
-        /// </exceptionAdapter>
+        /// </exception>
         public MicroEncoder(IPayloadSerializer serializer, IBufferSlice bufferSlice)
         {
             if (bufferSlice == null)

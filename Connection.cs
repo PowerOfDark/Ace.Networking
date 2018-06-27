@@ -180,7 +180,7 @@ namespace Ace.Networking
         /// <summary>
         ///     Starts receiving and sending data.
         /// </summary>
-        /// <exceptionAdapter cref="SslException">If SSL is enabled</exceptionAdapter>
+        /// <exception cref="SslException">If SSL is enabled</exception>
         public void Initialize()
         {
             if (Connected)
@@ -371,9 +371,9 @@ namespace Ace.Networking
             //TODO: Inconsistencies
             // Order:
             // * async (task) handlers: request/response and receive
-            // * local payload handlers (one exceptionAdapter breaks the chain)
+            // * local payload handlers (one exception breaks the chain)
             // * local 'global' payload callback
-            // * global payload handlers (one exceptionAdapter breaks the chain)
+            // * global payload handlers (one exception breaks the chain)
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -585,7 +585,7 @@ namespace Ace.Networking
         ///     Sends (pushes) a packet synchronously.
         /// </summary>
         /// <param name="tcs"></param>
-        /// <exceptionAdapter cref="SocketException">If the Connection had been closed.</exceptionAdapter>
+        /// <exception cref="SocketException">If the Connection had been closed.</exception>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void PushSendSync(TaskCompletionSource<object> tcs)
         {
