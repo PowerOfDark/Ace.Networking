@@ -11,5 +11,7 @@ namespace Ace.Networking.Interfaces
         Task Send<T>(T data);
         Task<TResponse> SendRequest<TSend, TResponse>(TSend data, CancellationToken? token = null);
         Task EnqueueSendResponse<T>(int requestId, T response);
+
+        void Close();
     }
 }

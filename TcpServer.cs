@@ -5,19 +5,21 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Ace.Networking.Handlers;
+using Ace.Networking.Interfaces;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.SSL;
+using Ace.Networking.Services;
 using static Ace.Networking.Connection;
 
 namespace Ace.Networking
 {
-    public class TcpServer : PayloadHandlerDispatcher
+    public class TcpServer : PayloadHandlerDispatcher, IServer
     {
-        public delegate bool AcceptClientFilter(Connection client);
+        public delegate bool AcceptClientFilter(IConnection client);
 
-        public delegate void ClientAcceptedHandler(Connection client);
+        public delegate void ClientAcceptedHandler(IConnection client);
 
-        public delegate void ReceiveTimeoutHandler(Connection connection);
+        public delegate void ReceiveTimeoutHandler(IConnection connection);
 
         public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
         private readonly Timer _timer;
@@ -29,18 +31,14 @@ namespace Ace.Networking
         private volatile bool _shuttingDown;
         protected ISslStreamFactory SslFactory;
 
-        public TcpServer(IPEndPoint endpoint, ProtocolConfiguration configuration)
+        public TcpServer(IPEndPoint endpoint, ProtocolConfiguration configuration, ISslStreamFactory sslFactory = null, IInternalServiceManager services = null)
         {
-            Connections = new ConcurrentDictionary<long, Connection>();
+            Connections = new ConcurrentDictionary<long, IConnection>();
             Endpoint = endpoint;
             Configuration = configuration;
             _timer = new Timer(Timer_Tick, null, 0, System.Threading.Timeout.Infinite);
-        }
-
-        public TcpServer(IPEndPoint endpoint, ProtocolConfiguration configuration,
-            ISslStreamFactory sslFactory) : this(endpoint, configuration)
-        {
             SslFactory = sslFactory;
+            _services = services ?? new BasicServiceManager();
         }
 
         /// <summary>
@@ -77,8 +75,11 @@ namespace Ace.Networking
 
         public SslMode SslMode => Configuration.SslMode;
 
+        private readonly IInternalServiceManager _services;
+        public IServiceManager Services => _services;
+
         public IPEndPoint Endpoint { get; protected set; }
-        public ConcurrentDictionary<long, Connection> Connections { get; }
+        public ConcurrentDictionary<long, IConnection> Connections { get; }
 
         public ProtocolConfiguration Configuration { get; protected set; }
         public event ClientAcceptedHandler ClientAccepted;
@@ -145,10 +146,14 @@ namespace Ace.Networking
             }
 
             _shuttingDown = false;
+
+            _services.Attach(this);
+
             _listener = new TcpListener(Endpoint);
             _listener.Start();
 
             _listenerTask = Task.Factory.StartNew(Accept, TaskCreationOptions.LongRunning);
+            
         }
 
         public virtual void Stop()
@@ -158,9 +163,12 @@ namespace Ace.Networking
                 throw new InvalidOperationException("Server has not been started");
             }
             _shuttingDown = true;
+            _services.Detach();
+
             _timer.Dispose();
             _listener.Stop();
             _listener = null;
+
             foreach (var connection in Connections)
             {
                 try
@@ -230,12 +238,12 @@ namespace Ace.Networking
             OnClientAccepted(con);
         }
 
-        private void OnClientAccepted(Connection connection)
+        private void OnClientAccepted(IConnection connection)
         {
             ClientAccepted?.Invoke(connection);
         }
 
-        private void Con_Disconnected(Connection connection, Exception exception)
+        private void Con_Disconnected(IConnection connection, Exception exception)
         {
             try
             {

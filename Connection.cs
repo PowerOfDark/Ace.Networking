@@ -24,7 +24,7 @@ namespace Ace.Networking
 {
     public sealed class Connection : PayloadHandlerDispatcher, IDisposable, IConnection
     {
-        public delegate void DisconnectHandler(Connection connection, Exception exception);
+        public delegate void DisconnectHandler(IConnection connection, Exception exception);
 
         public delegate bool PayloadFilter(object payload, Type type);
 

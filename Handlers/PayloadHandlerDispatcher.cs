@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Ace.Networking.Interfaces;
 
 namespace Ace.Networking.Handlers
 {
@@ -77,21 +79,9 @@ namespace Ace.Networking.Handlers
             RemoveAllTypeHandlers();
         }
 
-        /// <summary>
-        ///     WARNING: This function overwrites the specified request handler
-        /// </summary>
         public void OnRequest(Type type, RequestHandler handler)
         {
-            if (!RequestHandlers.TryAdd(type, handler))
-            {
-                try
-                {
-                    RequestHandlers[type] = handler;
-                }
-                catch
-                {
-                }
-            }
+            RequestHandlers.Append(type, handler);
         }
 
         /// <summary>
@@ -104,10 +94,10 @@ namespace Ace.Networking.Handlers
         }
 
         /// <summary>
-        ///     Returns the current request handler for the specified type, or null if doesn't exist
+        ///     Returns the current request handlers for the specified type, or null if doesn't exist
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public RequestHandler OnRequest(Type type)
+        public IReadOnlyCollection<RequestHandler> OnRequest(Type type)
         {
             if (RequestHandlers.TryGetValue(type, out var handler))
             {
@@ -116,11 +106,8 @@ namespace Ace.Networking.Handlers
             return null;
         }
 
-        /// <summary>
-        ///     Returns the current request handler for the specified type, or null if doesn't exist
-        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public RequestHandler OnRequest<T>()
+        public IReadOnlyCollection<RequestHandler> OnRequest<T>()
         {
             return OnRequest(typeof(T));
         }
@@ -137,7 +124,7 @@ namespace Ace.Networking.Handlers
             return OffRequest(typeof(T));
         }
 
-        protected void ProcessPayloadHandlers(Connection connection, object obj, Type type,
+        protected void ProcessPayloadHandlers(IConnection connection, object obj, Type type,
             Action<object> responseSender = null, int? requestId = null)
         {
             if (TypeHandlers.TryGetValue(type, out var list))
@@ -168,13 +155,21 @@ namespace Ace.Networking.Handlers
             {
                 if (RequestHandlers.TryGetValue(type, out var handler))
                 {
-                    try
+                    lock (handler)
                     {
-                        handler?.Invoke(new RequestWrapper(connection, requestId.Value, obj));
+                        foreach (var h in handler)
+                        {
+                            try
+                            {
+                                if (h?.Invoke(new RequestWrapper(connection, requestId.Value, obj)) ?? false) break;
+                            }
+                            catch
+                            {
+                            }
+                        }
+
                     }
-                    catch
-                    {
-                    }
+
                 }
             }
         }

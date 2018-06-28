@@ -2,21 +2,22 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Ace.Networking.Interfaces;
 using Ace.Networking.MicroProtocol.Interfaces;
 
 namespace Ace.Networking.Handlers
 {
     public abstract class PayloadHandlerDispatcherBase
     {
-        public delegate object GenericPayloadHandler<in T>(Connection connection, T payload);
+        public delegate object GenericPayloadHandler<in T>(IConnection connection, T payload);
 
-        public delegate void GlobalPayloadHandler(Connection connection, object payload, Type type);
+        public delegate void GlobalPayloadHandler(IConnection connection, object payload, Type type);
 
-        public delegate object PayloadHandler(Connection connection, object payload, Type type);
+        public delegate object PayloadHandler(IConnection connection, object payload, Type type);
 
-        public delegate void RequestHandler(RequestWrapper request);
+        public delegate bool RequestHandler(RequestWrapper request);
 
-        protected ConcurrentDictionary<Type, RequestHandler> RequestHandlers = new ConcurrentDictionary<Type, RequestHandler>();
+        protected ConcurrentDictionary<Type, LinkedList<RequestHandler>> RequestHandlers = new ConcurrentDictionary<Type, LinkedList<RequestHandler>>();
 
         protected ConcurrentDictionary<Type, LinkedList<IPayloadHandlerWrapper>> TypeHandlers =
             new ConcurrentDictionary<Type, LinkedList<IPayloadHandlerWrapper>>();
