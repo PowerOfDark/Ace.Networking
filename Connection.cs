@@ -252,18 +252,21 @@ namespace Ace.Networking
         private void OnPayloadReceived(BasicHeader header, object obj, Type type)
         {
             int? unboxedRequest = null;
+            bool isUnhandledRequest = false;
             if (header.PacketType == PacketType.Trackable)
             {
                 if (header is TrackableHeader tHeader)
                 {
                     if (header.PacketFlag.HasFlag(PacketFlag.IsRequest))
                     {
+                        isUnhandledRequest = true;
                         unboxedRequest = tHeader.RequestId;
                         if (_requestHandlers.TryGetValue(type, out var queue))
                         {
                             var wrapper = new RequestWrapper(this, tHeader.RequestId, obj);
                             lock (queue)
                             {
+                                isUnhandledRequest = queue.Count == 0;
                                 while (queue.Count > 0)
                                 {
                                     queue.Dequeue()?.TrySetResult(wrapper);
@@ -290,6 +293,7 @@ namespace Ace.Networking
                 }
                 if (unboxedRequest.HasValue)
                 {
+                    isUnhandledRequest = false;
                     EnqueueSendResponse(((TrackableHeader) header).RequestId, o);
                 }
                 else
@@ -367,6 +371,9 @@ namespace Ace.Networking
             {
                 // ignored
             }
+
+            if(isUnhandledRequest)
+                EnqueueSendResponse<object>(((TrackableHeader)header).RequestId, null);
 
             //TODO: Inconsistencies
             // Order:

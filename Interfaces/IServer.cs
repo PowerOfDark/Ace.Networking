@@ -19,5 +19,6 @@ namespace Ace.Networking.Interfaces
         bool Off<T>(PayloadHandlerDispatcherBase.PayloadHandler handler);
 
         void OnRequest<T>(PayloadHandlerDispatcherBase.RequestHandler handler);
+        bool OffRequest<T>(PayloadHandlerDispatcherBase.RequestHandler handler);
     }
 }

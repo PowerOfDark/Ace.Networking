@@ -26,10 +26,19 @@ namespace Ace.Networking.Entanglement.ProxyImpl
         public void Execute(IRequestWrapper req)
         {
             var cmd = (ExecuteMethod) req.Request;
+
             //find the best overload
             var overload = Descriptor.FindOverload(cmd);
             lock (Context)
             {
+                if (!Context.All.ContainsClient(req.Connection))
+                {
+                    req.SendResponse(new ExecuteMethodResult()
+                    {
+                        ExceptionAdapter = new RemoteExceptionAdapter("Unauthorized")
+                    });
+                    return;
+                }
                 Context.Sender = req.Connection;
                 RemoteExceptionAdapter exception = null;
                 Task task = null;
@@ -106,6 +115,11 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                 }
 
             }
+        }
+
+        public void AddClient(IConnection client)
+        {
+            Context?.All.AddClient(client);
         }
     }
 }

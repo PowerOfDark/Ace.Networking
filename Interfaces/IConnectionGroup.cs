@@ -9,5 +9,6 @@ namespace Ace.Networking.Interfaces
         IEnumerable<IConnection> Clients { get; }
         void AddClient(IConnection client);
         void RemoveClient(IConnection client);
+        bool ContainsClient(IConnection client);
     }
 }

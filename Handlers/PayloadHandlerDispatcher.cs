@@ -119,6 +119,22 @@ namespace Ace.Networking.Handlers
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool OffRequest(Type type, RequestHandler handler)
+        {
+            if (RequestHandlers.TryGetValue(type, out var list))
+            {
+                return list.RemoveFirst(t => t == handler);
+            }
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool OffRequest<T>(RequestHandler handler)
+        {
+            return OffRequest(typeof(T), handler);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool OffRequest<T>()
         {
             return OffRequest(typeof(T));
