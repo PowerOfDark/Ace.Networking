@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using MessagePack;
 using ProtoBuf;
 
 namespace Ace.Networking.Entanglement.Packets

@@ -24,8 +24,11 @@ namespace Ace.Networking.Entanglement.Reflection
     public class InterfaceDescriptor
     {
         public Type Type { get; }
-        public Dictionary<string, PropertyInfo> Properties = new Dictionary<string, PropertyInfo>();
-        public Dictionary<string, LinkedList<MethodDescriptor>> Methods = new Dictionary<string, LinkedList<MethodDescriptor>>();
+        private Dictionary<string, PropertyInfo> _properties = new Dictionary<string, PropertyInfo>();
+        private Dictionary<string, IReadOnlyCollection<MethodDescriptor>> _methods = new Dictionary<string, IReadOnlyCollection<MethodDescriptor>>();
+
+        public IReadOnlyDictionary<string, PropertyInfo> Properties => _properties;
+        public IReadOnlyDictionary<string, IReadOnlyCollection<MethodDescriptor>> Methods => _methods;
 
         public static ConcurrentDictionary<Type, InterfaceDescriptor> Cache =
             new ConcurrentDictionary<Type, InterfaceDescriptor>();
@@ -63,7 +66,7 @@ namespace Ace.Networking.Entanglement.Reflection
                     var current = q.Dequeue();
                     foreach (var p in current.GetProperties(BindingFlags.Public | BindingFlags.Instance))
                     {
-                        Properties[p.Name] = p;
+                        this._properties[p.Name] = p;
                     }
                     foreach (var i in t.GetInterfaces())
                     {
@@ -92,7 +95,7 @@ namespace Ace.Networking.Entanglement.Reflection
                     }
                 }
 
-                Properties[p.Name] = p;
+                this._properties[p.Name] = p;
             }
         }
 
@@ -119,8 +122,17 @@ namespace Ace.Networking.Entanglement.Reflection
                             "The entangled interface methods need to return either Task or Task<T>.");
                     else return;
                 }
+                LinkedList<MethodDescriptor> list;
 
-                Methods.Append(m.Name, new MethodDescriptor()
+                if (!_methods.TryGetValue(m.Name, out var c))
+                {
+                    _methods[m.Name] = list = new LinkedList<MethodDescriptor>();
+                }
+                else
+                    list = (LinkedList<MethodDescriptor>)c;
+
+
+                list.AddLast(new MethodDescriptor()
                 {
                     Method = m,
                     Parameters =
@@ -163,7 +175,7 @@ namespace Ace.Networking.Entanglement.Reflection
 
         public MethodDescriptor FindOverload(ExecuteMethod cmd)
         {
-            foreach (var m in Methods[cmd.Method])
+            foreach (var m in _methods[cmd.Method])
             {
                 if (m.RealReturnType.FullName == cmd.ReturnValueFullName && m.Parameters.Length == (cmd.Arguments?.Length??0))
                 {

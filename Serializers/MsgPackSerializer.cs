@@ -29,7 +29,7 @@ namespace Ace.Networking.Serializers
         /// </param>
         public void Serialize(object source, Stream destination, out byte[] contentType)
         {
-            var type = source.GetType();
+            var type = source?.GetType() ?? typeof(object);
             contentType = CreateContentType(type);
             MessagePackSerializer.NonGeneric.Serialize(type, destination, source,
                 ContractlessStandardResolver.Instance);
@@ -37,7 +37,7 @@ namespace Ace.Networking.Serializers
 
         public void Serialize(object source, Stream destination)
         {
-            var type = source.GetType();
+            var type = source?.GetType() ?? typeof(object);
             MessagePackSerializer.NonGeneric.Serialize(type, destination, source,
                 ContractlessStandardResolver.Instance);
         }
@@ -61,7 +61,8 @@ namespace Ace.Networking.Serializers
             var type = Encoding.UTF8.GetString(contentType, 2, contentType.Length - 2);
             if (!Types.TryGetValue(type, out resolvedType)) throw new InvalidCastException("Unknown type");
 
-            return Serializer.NonGeneric.Deserialize(resolvedType, source);
+            return MessagePackSerializer.NonGeneric.Deserialize(resolvedType, source,
+                ContractlessStandardResolver.Instance);
         }
 
         public object DeserializeType(Type type, Stream source)
@@ -97,8 +98,14 @@ namespace Ace.Networking.Serializers
             lock (Types)
             {
                 var types = assembly.GetTypes()
-                    .Where(t => t.GetTypeInfo().GetCustomAttribute(typeof(MessagePackObjectAttribute)) != null);
-                foreach (var type in types) Types.Add(type.FullName, type);
+                    .Where(t =>
+                    {
+                        var ti = t.GetTypeInfo();
+                        return ti.GetCustomAttribute<MessagePackObjectAttribute>() != null || ti.GetCustomAttribute<ProtoContractAttribute>() != null;
+                    });
+                foreach (var type in types)
+                    Types[type.FullName] = type;
+                Types["System.Object"] = typeof(object);
             }
         }
     }

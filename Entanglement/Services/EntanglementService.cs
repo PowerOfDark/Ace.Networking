@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using Ace.Networking.Entanglement.Packets;
 using Ace.Networking.Entanglement.ProxyImpl;
+using Ace.Networking.Entanglement.Reflection;
 using Ace.Networking.Entanglement.Structures;
 using Ace.Networking.Interfaces;
 
@@ -33,18 +34,21 @@ namespace Ace.Networking.Entanglement.Services
         public void Attach(IServer server)
         {
             if (IsActive) return;
+            IsActive = true;
             Objects.Clear();
             Server = server;
-            server.OnRequest<ExecuteMethodResult>(OnRequestExecuteMethodResult);
-            server.OnRequest<EntangleResult>(OnRequestEntangle);
+            server.OnRequest<ExecuteMethod>(OnRequestExecuteMethodResult);
+            server.OnRequest<EntangleRequest>(OnRequestEntangle);
+            Console.WriteLine("Entanglement service online!");
         }
 
         public void Detach()
         {
             if (!IsActive) return;
+            IsActive = false;
 
-            Server.OffRequest<ExecuteMethodResult>(OnRequestExecuteMethodResult);
-            Server.OffRequest<EntangleResult>(OnRequestEntangle);
+            Server.OffRequest<ExecuteMethod>(OnRequestExecuteMethodResult);
+            Server.OffRequest<EntangleRequest>(OnRequestEntangle);
             Objects.Clear();
             Server = null;
         }
@@ -68,8 +72,8 @@ namespace Ace.Networking.Entanglement.Services
         {
             var guid = typeof(TBase).GetTypeInfo().GUID;
             if (!Interfaces.TryAdd(guid,
-                new InterfaceEntry {Access = access, Type = typeof(T)}))
-                Interfaces[guid].Access |= access;
+                new InterfaceEntry {Access = access, Type = typeof(T), InterfaceId = guid, InterfaceDescriptor = InterfaceDescriptor.Get(typeof(TBase))}))
+                Interfaces[guid].Access = access;
         }
 
         protected Guid? GetExistingEid(InterfaceEntry ie, IConnection scope = null)
@@ -93,8 +97,7 @@ namespace Ace.Networking.Entanglement.Services
 
         protected Guid? CreateInstance(InterfaceEntry ie, IConnection scope = null)
         {
-            if ((ie.Access == EntanglementAccess.Manual || ie.Access == EntanglementAccess.Global) &&
-                scope != null) return null;
+            if ((ie.Access == EntanglementAccess.Manual) && scope != null) return null;
             if (ie.Access == EntanglementAccess.Scoped && (scope == null || !scope.Connected)) return null;
             if (GetExistingEid(ie, scope).HasValue) return null;
 
@@ -131,7 +134,8 @@ namespace Ace.Networking.Entanglement.Services
 
         private bool OnRequestEntangle(IRequestWrapper request)
         {
-            if (!(request.Request is EntangleRequest req)) return false;
+            Console.WriteLine("On request entangle");
+            var req = (EntangleRequest) request.Request;
 
             Guid? eid = null;
 
@@ -175,7 +179,8 @@ namespace Ace.Networking.Entanglement.Services
 
         protected bool OnRequestExecuteMethodResult(IRequestWrapper wrapper)
         {
-            if (!(wrapper.Request is ExecuteMethod cmd)) return false;
+            Console.WriteLine("On request execute method result");
+            var cmd = (ExecuteMethod) wrapper.Request;
             if (Objects.TryGetValue(cmd.Eid, out var obj)) obj.Execute(wrapper);
             return true;
         }

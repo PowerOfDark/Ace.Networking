@@ -4,11 +4,11 @@ using System.Text;
 
 namespace Ace.Networking.Interfaces
 {
-    public interface IConnectionGroup : IConnectionInterface
+    public interface IConnectionGroup : IMulticastConnectionInterface
     {
         IEnumerable<IConnection> Clients { get; }
         void AddClient(IConnection client);
-        void RemoveClient(IConnection client);
+        bool RemoveClient(IConnection client);
         bool ContainsClient(IConnection client);
     }
 }
