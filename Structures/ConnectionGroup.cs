@@ -9,8 +9,8 @@ namespace Ace.Networking.Structures
 {
     public class ConnectionGroup : IConnectionGroup
     {
-        private HashSet<IConnection> _clients = new HashSet<IConnection>();
-        public IEnumerable<IConnection> Clients => throw new NotImplementedException();
+        private readonly HashSet<IConnection> _clients = new HashSet<IConnection>();
+        public IEnumerable<IConnection> Clients => _clients;
 
         public void AddClient(IConnection client)
         {
