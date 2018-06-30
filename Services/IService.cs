@@ -9,7 +9,7 @@ namespace Ace.Networking.Services
     {
         bool IsActive { get; }
 
-        void Attach(IServer server);
-        void Detach();
+        void Attach(IConnectionDispatcherInteface server);
+        void Detach(IConnectionDispatcherInteface server);
     }
 }

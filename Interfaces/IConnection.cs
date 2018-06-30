@@ -13,7 +13,5 @@ namespace Ace.Networking.Interfaces
         IConnectionData Data { get; }
         bool Connected { get; }
         DateTime LastReceived { get; }
-
-        event Connection.DisconnectHandler Disconnected;
     }
 }

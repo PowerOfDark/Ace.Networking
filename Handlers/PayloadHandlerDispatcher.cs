@@ -5,7 +5,7 @@ using Ace.Networking.Interfaces;
 
 namespace Ace.Networking.Handlers
 {
-    public abstract class PayloadHandlerDispatcher : PayloadHandlerDispatcherBase
+    public abstract class PayloadHandlerDispatcher : PayloadHandlerDispatcherBase, IConnectionDispatcherInteface
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AppendPayloadHandler(Type type, PayloadHandler handler)

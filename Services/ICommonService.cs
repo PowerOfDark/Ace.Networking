@@ -5,8 +5,9 @@ using Ace.Networking.Interfaces;
 
 namespace Ace.Networking.Services
 {
-    public interface IInternalServiceManager : IServiceManager, IAttachable
+    public interface IServerService : IService
     {
-
+        void Attach(IServer server);
+        void Detach(IServer server);
     }
 }

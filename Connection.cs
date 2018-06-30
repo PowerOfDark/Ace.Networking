@@ -16,6 +16,7 @@ using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.PacketTypes;
 using Ace.Networking.MicroProtocol.SSL;
 using Ace.Networking.MicroProtocol.Structures;
+using Ace.Networking.Services;
 using Ace.Networking.Structures;
 using Ace.Networking.Threading;
 using static Ace.Networking.MicroProtocol.Headers.RawDataHeader;
@@ -106,19 +107,23 @@ namespace Ace.Networking
             Client = client;
         }
 
-        public Connection(TcpClient client, ProtocolConfiguration configuration) : this(client,
+        public Connection(TcpClient client, ProtocolConfiguration configuration, IInternalServiceManager services = null) : this(client,
             configuration.PayloadEncoder.Clone(), configuration.PayloadDecoder.Clone())
         {
             SslMode = configuration.SslMode;
             CustomOutcomingMessageQueue = configuration.CustomOutcomingMessageQueue;
             CustomIncomingMessageQueue = configuration.CustomIncomingMessageQueue;
+            _services = services ?? BasicServiceManager.Empty;
         }
 
         public Connection(TcpClient client, ProtocolConfiguration configuration,
-            ISslStreamFactory sslFactory) : this(client, configuration)
+            ISslStreamFactory sslFactory, IInternalServiceManager services = null) : this(client, configuration, services)
         {
             _sslFactory = sslFactory;
         }
+
+        private IInternalServiceManager _services;
+        public IServiceManager Services => _services;
 
         public bool UseCustomOutcomingMessageQueue => CustomOutcomingMessageQueue != null;
         public bool UseCustomIncomingMessageQueue => CustomIncomingMessageQueue != null;
@@ -226,6 +231,8 @@ namespace Ace.Networking
                 _receiveWorkerThread.Start();
 #endif
             }
+
+            _services.Attach(this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -246,6 +253,8 @@ namespace Ace.Networking
             {
                 CustomOutcomingMessageQueue.RemoveClient();
             }
+
+            _services.Detach(this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -7,36 +7,35 @@ namespace Ace.Networking.Services
 {
     public class BasicServiceManager : IInternalServiceManager
     {
-        protected Dictionary<Type, IService> Services = new Dictionary<Type, IService>();
+        public static BasicServiceManager Empty = new BasicServiceManager();
 
-        public void Add<TBase, T>(T instance) where T : TBase where TBase : IService
+        protected IReadOnlyDictionary<Type, IService> Services = new Dictionary<Type, IService>();
+
+        protected BasicServiceManager() { }
+
+        public BasicServiceManager(IDictionary<Type, IService> services)
         {
-            lock (Services)
-            {
-                Services.Add(typeof(TBase), instance);
-            }
+            Services = new Dictionary<Type, IService>(services);
         }
 
-        public void Attach(IServer server)
+        public void Attach(IConnectionDispatcherInteface server)
         {
             lock (Services)
             {
                 foreach (var service in Services)
                 {
-                    if (!service.Value.IsActive)
-                        service.Value.Attach(server);
+                    service.Value.Attach(server);
                 }
             }
         }
 
-        public void Detach()
+        public void Detach(IConnectionDispatcherInteface server)
         {
             lock (Services)
             {
                 foreach (var service in Services)
                 {
-                    if (service.Value.IsActive)
-                        service.Value.Detach();
+                    service.Value.Detach(server);
                 }
             }
         }

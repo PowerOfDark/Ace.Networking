@@ -27,30 +27,26 @@ namespace Ace.Networking.Entanglement.Services
             ScopedObjectMap =
                 new ConcurrentDictionary<IConnection, ConcurrentDictionary<Guid, Guid>>();
 
-        protected IServer Server { get; private set; }
+        protected HashSet<IConnectionDispatcherInteface> BoundInterfaces { get; private set; } =
+            new HashSet<IConnectionDispatcherInteface>();
 
-        public bool IsActive { get; protected set; }
+        public bool IsActive => BoundInterfaces.Count > 0;
 
-        public void Attach(IServer server)
+        public void Attach(IConnectionDispatcherInteface server)
         {
-            if (IsActive) return;
-            IsActive = true;
-            Objects.Clear();
-            Server = server;
+            if (BoundInterfaces.Contains(server)) return;
+            BoundInterfaces.Add(server);
             server.OnRequest<ExecuteMethod>(OnRequestExecuteMethodResult);
             server.OnRequest<EntangleRequest>(OnRequestEntangle);
             Console.WriteLine("Entanglement service online!");
         }
 
-        public void Detach()
+        public void Detach(IConnectionDispatcherInteface server)
         {
-            if (!IsActive) return;
-            IsActive = false;
-
-            Server.OffRequest<ExecuteMethod>(OnRequestExecuteMethodResult);
-            Server.OffRequest<EntangleRequest>(OnRequestEntangle);
-            Objects.Clear();
-            Server = null;
+            if (!BoundInterfaces.Remove(server)) return;
+            
+            server.OffRequest<ExecuteMethod>(OnRequestExecuteMethodResult);
+            server.OffRequest<EntangleRequest>(OnRequestEntangle);
         }
 
         public EntangledHostedObjectBase GetObject(Guid eid)

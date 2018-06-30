@@ -38,7 +38,7 @@ namespace Ace.Networking
             Configuration = configuration;
             _timer = new Timer(Timer_Tick, null, 0, System.Threading.Timeout.Infinite);
             SslFactory = sslFactory;
-            _services = services ?? new BasicServiceManager();
+            _services = services ?? BasicServiceManager.Empty;
         }
 
         /// <summary>
@@ -163,7 +163,7 @@ namespace Ace.Networking
                 throw new InvalidOperationException("Server has not been started");
             }
             _shuttingDown = true;
-            _services.Detach();
+            _services.Detach(this);
 
             _timer.Dispose();
             _listener.Stop();
