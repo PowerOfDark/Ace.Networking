@@ -1,12 +1,13 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
+using Ace.Networking.Interfaces;
 
 namespace Ace.Networking.Services
 {
-    public interface IServicesBuilder
+    public interface IServicesBuilder<TInterface> where TInterface : class, ICommon
     {
-        IServicesBuilder Add<TBase, T>(T instance, Action<T> config = null) where T : TBase where TBase : IService;
-        IInternalServiceManager Build();
+        IServicesBuilder<TInterface> Add<TBase, T>(T instance, Action<T> config = null)
+            where T : TBase where TBase : IService<TInterface>;
+
+        IInternalServiceManager<TInterface> Build();
     }
 }

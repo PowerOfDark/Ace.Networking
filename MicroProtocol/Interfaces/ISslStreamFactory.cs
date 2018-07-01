@@ -8,6 +8,6 @@ namespace Ace.Networking.MicroProtocol.Interfaces
         ///     Build a new SSL steam.
         /// </summary>
         /// <returns>Stream which is ready to be used (must have been validated)</returns>
-        SslStream Build(Connection connection);
+        SslStream Build(ISslContainer connection);
     }
 }

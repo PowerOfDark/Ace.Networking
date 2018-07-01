@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Ace.Networking.Interfaces;
+﻿using Ace.Networking.Interfaces;
 
 namespace Ace.Networking.Services
 {
-    public interface IInternalServiceManager : IServiceManager, IAttachable
+    public interface IInternalServiceManager<T> : IServiceManager<T>, IAttachable<T> where T : class, ICommon
     {
-
     }
 }

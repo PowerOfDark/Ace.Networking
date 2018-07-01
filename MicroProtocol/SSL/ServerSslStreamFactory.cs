@@ -37,7 +37,7 @@ namespace Ace.Networking.MicroProtocol.SSL
         /// </summary>
         public X509Certificate Certificate { get; }
 
-        public SslStream Build(Connection connection)
+        public SslStream Build(ISslContainer connection)
         {
             connection.SslCertificates = new SslCertificatePair {Certificate = Certificate};
             var stream = new SslStream(connection.Client.GetStream(), true,
@@ -51,7 +51,7 @@ namespace Ace.Networking.MicroProtocol.SSL
             }
             catch (IOException err)
             {
-                throw new SslException("Failed to authenticate " + connection.Socket.RemoteEndPoint, err);
+                throw new SslException("Failed to authenticate", err);
             }
             catch (ObjectDisposedException err)
             {
@@ -59,25 +59,22 @@ namespace Ace.Networking.MicroProtocol.SSL
             }
             catch (AuthenticationException err)
             {
-                throw new SslException("Failed to authenticate " + connection.Socket.RemoteEndPoint, err);
+                throw new SslException("Failed to authenticate", err);
             }
 
             return stream;
         }
 
 
-        protected virtual bool OnRemoteCertificateValidation(Connection sender, X509Certificate certificate, X509Chain chain,
+        protected virtual bool OnRemoteCertificateValidation(ISslContainer sender, X509Certificate certificate,
+            X509Chain chain,
             SslPolicyErrors sslpolicyerrors)
         {
-            sender.SslCertificates.RemoteCertificate = new BasicCertificateInfo(certificate);
-            sender.SslCertificates.RemotePolicyErrors = sslpolicyerrors;
+            ((SslCertificatePair) sender.SslCertificates).RemoteCertificate = new BasicCertificateInfo(certificate);
+            ((SslCertificatePair) sender.SslCertificates).RemotePolicyErrors = sslpolicyerrors;
             if (UseClientCertificate)
-            {
                 if (sslpolicyerrors != SslPolicyErrors.None)
-                {
                     return false;
-                }
-            }
             return true;
         }
     }

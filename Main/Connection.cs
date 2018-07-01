@@ -23,7 +23,7 @@ using static Ace.Networking.MicroProtocol.Headers.RawDataHeader;
 
 namespace Ace.Networking
 {
-    public sealed class Connection : PayloadHandlerDispatcher, IDisposable, IConnection
+    public sealed class Connection : PayloadHandlerDispatcher, IDisposable, IConnection, ISslContainer
     {
         public delegate void DisconnectHandler(IConnection connection, Exception exception);
 
@@ -85,7 +85,7 @@ namespace Ace.Networking
         private Stream _stream;
         private SocketBuffer _writeBuffer;
 
-        internal InternalPayloadDispatchHandler PayloadDispatchHandler;
+        public InternalPayloadDispatchHandler PayloadDispatchHandler;
 
         private Connection(IPayloadEncoder encoder, IPayloadDecoder decoder)
         {
@@ -99,37 +99,37 @@ namespace Ace.Networking
             _decoder.PacketReceived = OnPayloadReceived;
             _decoder.RawDataReceived = OnRawDataReceived;
 
-            Data = new ConnectionData();
         }
 
-        private Connection(TcpClient client, IPayloadEncoder encoder, IPayloadDecoder decoder) : this(encoder, decoder)
+
+ 
+
+        internal Connection(TcpClient client, ProtocolConfiguration configuration,
+            IInternalServiceManager<IConnection> services = null, ISslStreamFactory sslFactory = null, IConnectionData data = null, InternalPayloadDispatchHandler dispatcher = null) : this(configuration.PayloadEncoder.Clone(), configuration.PayloadDecoder.Clone())
         {
+            if (configuration == null)
+                throw new ArgumentNullException(nameof(configuration));
+            if (client == null || !client.Connected)
+                throw new ArgumentException(nameof(client));
+
             Client = client;
-        }
 
-        public Connection(TcpClient client, ProtocolConfiguration configuration, IInternalServiceManager services = null) : this(client,
-            configuration.PayloadEncoder.Clone(), configuration.PayloadDecoder.Clone())
-        {
             SslMode = configuration.SslMode;
             CustomOutcomingMessageQueue = configuration.CustomOutcomingMessageQueue;
             CustomIncomingMessageQueue = configuration.CustomIncomingMessageQueue;
-            _services = services ?? BasicServiceManager.Empty;
-        }
-
-        public Connection(TcpClient client, ProtocolConfiguration configuration,
-            ISslStreamFactory sslFactory, IInternalServiceManager services = null) : this(client, configuration, services)
-        {
+            _services = services;// ?? BasicServiceManager<IConnection>.Empty;
             _sslFactory = sslFactory;
+            Data = data;
+            PayloadDispatchHandler = dispatcher;
         }
 
-        private IInternalServiceManager _services;
-        public IServiceManager Services => _services;
+        private readonly IInternalServiceManager<IConnection> _services;
+        public IServiceManager<IConnection> Services => _services;
 
         public bool UseCustomOutcomingMessageQueue => CustomOutcomingMessageQueue != null;
         public bool UseCustomIncomingMessageQueue => CustomIncomingMessageQueue != null;
 
         public ThreadedQueueProcessor<ReceiveMessageQueueItem> CustomIncomingMessageQueue { get; }
-
         public ThreadedQueueProcessor<SendMessageQueueItem> CustomOutcomingMessageQueue { get; }
 
         public long Identifier { get; }
@@ -153,14 +153,21 @@ namespace Ace.Networking
         }
 
         public IConnectionData Data { get; set; }
-        public SslCertificatePair SslCertificates { get; internal set; }
+
+        private ISslCertificatePair _sslCertificates;
+        public ISslCertificatePair SslCertificates => _sslCertificates;
+        ISslCertificatePair ISslContainer.SslCertificates
+        {
+            get => _sslCertificates;
+            set => _sslCertificates = value; }
+        
 
         /// <summary>
         ///     Gets the <code>DateTime</code> of the last received packet.
         /// </summary>
         public DateTime LastReceived { get; internal set; }
 
-        public event DisconnectHandler Disconnected;
+        public event DisconnectHandler ClientDisconnected;
 
         /// <summary>
         ///     Catch-all for all payload received.
@@ -232,6 +239,7 @@ namespace Ace.Networking
 #endif
             }
 
+            LastReceived = DateTime.Now;
             _services.Attach(this);
         }
 
@@ -843,7 +851,7 @@ namespace Ace.Networking
             ClearHandlers(exception);
             _sendWorkerWaitHandle?.Set();
             OnDisconnected();
-            Disconnected?.Invoke(this, exception);
+            ClientDisconnected?.Invoke(this, exception);
 
             Cleanup();
         }
@@ -991,7 +999,7 @@ namespace Ace.Networking
             return _rawDataHandlers.TryRemove(bufId, out _);
         }
 
-        internal delegate void InternalPayloadDispatchHandler(Connection connection, object payload, Type type,
+        public delegate void InternalPayloadDispatchHandler(Connection connection, object payload, Type type,
             Action<object> responseSender, int? requestId);
 
         #region IDisposable Support

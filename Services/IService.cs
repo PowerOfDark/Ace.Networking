@@ -1,15 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Ace.Networking.Interfaces;
+﻿using Ace.Networking.Interfaces;
 
 namespace Ace.Networking.Services
 {
-    public interface IService
+    public interface IService<in T> where T : class, ICommon
     {
         bool IsActive { get; }
 
-        void Attach(IConnectionDispatcherInteface server);
-        void Detach(IConnectionDispatcherInteface server);
+        void Attach(T server);
+        void Detach(T server);
     }
 }

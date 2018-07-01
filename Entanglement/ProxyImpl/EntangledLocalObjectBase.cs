@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Ace.Networking.Entanglement.Packets;
 using Ace.Networking.Entanglement.Reflection;
@@ -13,12 +11,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 {
     public abstract class EntangledLocalObjectBase : EntangledObjectBase
     {
-        public IConnection Host { get; internal set; }
-
-        public EntangledLocalObjectBase()
-        {
-            Console.WriteLine("HEllo WWorLd!");
-        }
+        protected object _sync = new object();
 
         public EntangledLocalObjectBase(IConnection host, Guid eid, InterfaceDescriptor desc)
         {
@@ -27,25 +20,26 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             Descriptor = desc;
         }
 
+        public IConnection Host { get; internal set; }
+
         public ExecuteMethod GetExecuteMethodDescriptor(string name, Type returnType, params object[] arg)
         {
-            var exe = new ExecuteMethod()
+            var exe = new ExecuteMethod
             {
-                Eid = this.Eid,
+                Eid = Eid,
                 Arguments = arg?.Select(t =>
                 {
                     using (var ms = new MemoryStream())
                     {
                         Host.Serializer.Serialize(t, ms);
 
-                        var p = new MethodParameter()
+                        var p = new MethodParameter
                         {
                             FullName = t.GetType().FullName,
                             SerializedData = ms.ToArray()
                         };
                         return p;
                     }
-                        
                 }).ToArray(),
                 Method = name,
                 ReturnValueFullName = returnType.FullName
@@ -59,7 +53,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             var res = await Host.SendRequest<ExecuteMethod, ExecuteMethodResult>(desc);
             if (res.ExceptionAdapter != null)
                 throw new RemoteException(res.ExceptionAdapter);
-            return (T)res.Data;
+            return (T) res.Data;
         }
 
         public async Task ExecuteMethodVoid(string name, params object[] arg)
@@ -70,5 +64,28 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                 throw new RemoteException(res.ExceptionAdapter);
         }
 
+        public void UpdateProperties(IConnection host, UpdateProperties updates)
+        {
+            if ((updates?.Updates.Count ?? 0) == 0) return;
+
+            lock (_sync)
+            {
+                foreach (var update in updates.Updates)
+                    if (Descriptor.Properties.TryGetValue(update.PropertyName, out var prop))
+                        using (var ms = new MemoryStream(update.SerializedData))
+                        {
+                            prop.BackingField.SetValue(this,
+                                host.Serializer.DeserializeType(prop.BackingField.FieldType, ms));
+                        }
+            }
+
+            foreach (var update in updates.Updates) OnPropertyChanged(update.PropertyName);
+        }
+
+        private object updateProperties(IConnection host, UpdateProperties updates)
+        {
+            UpdateProperties(host, updates);
+            return null;
+        }
     }
 }

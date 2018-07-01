@@ -1,8 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Net.Sockets;
-using Ace.Networking.MicroProtocol.Interfaces;
+using System.Threading;
 
 namespace Ace.Networking
 {
@@ -19,8 +18,10 @@ namespace Ace.Networking
                     list.Remove(iterator);
                     return true;
                 }
+
                 iterator = next;
             }
+
             return false;
         }
 
@@ -32,12 +33,6 @@ namespace Ace.Networking
             list.AddLast(val);
         }
 
-        public static Connection ToConnection(this TcpClient client, ProtocolConfiguration configuration,
-            ISslStreamFactory ssl = null)
-        {
-            return new Connection(client, configuration, ssl);
-        }
-
         public static bool TryAddLast<TKey, TValue>(this ConcurrentDictionary<TKey, LinkedList<TValue>> dict, TKey key,
             TValue val)
         {
@@ -46,18 +41,15 @@ namespace Ace.Networking
             if (!dict.TryGetValue(key, out list))
             {
                 ret = dict.TryAdd(key, list = new LinkedList<TValue>());
-                if (!ret)
-                {
-                    ret = dict.TryGetValue(key, out list);
-                }
+                if (!ret) ret = dict.TryGetValue(key, out list);
             }
+
             if (ret)
-            {
                 lock (list)
                 {
                     list.AddLast(val);
                 }
-            }
+
             return ret;
         }
 
@@ -69,19 +61,28 @@ namespace Ace.Networking
             if (!dict.TryGetValue(key, out queue))
             {
                 ret = dict.TryAdd(key, queue = new Queue<TValue>(capacity));
-                if (!ret)
-                {
-                    ret = dict.TryGetValue(key, out queue);
-                }
+                if (!ret) ret = dict.TryGetValue(key, out queue);
             }
+
             if (ret)
-            {
                 lock (queue)
                 {
                     queue.Enqueue(val);
                 }
-            }
+
             return ret;
+        }
+
+        public static CancellationToken? GetCancellationToken(this TimeSpan? ts)
+        {
+            if (ts.HasValue)
+                return new CancellationTokenSource(ts.Value).Token;
+            return null;
+        }
+
+        public static CancellationToken GetCancellationToken(this TimeSpan ts)
+        {
+            return new CancellationTokenSource(ts).Token;
         }
     }
 }

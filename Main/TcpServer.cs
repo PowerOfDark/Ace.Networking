@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Ace.Networking.Handlers;
 using Ace.Networking.Interfaces;
-using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.SSL;
 using Ace.Networking.Services;
 using static Ace.Networking.Connection;
@@ -22,6 +21,7 @@ namespace Ace.Networking
         public delegate void ReceiveTimeoutHandler(IConnection connection);
 
         public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
+        private readonly IInternalServiceManager<IServer> _services;
         private readonly Timer _timer;
         private TcpListener _listener;
         private Task _listenerTask;
@@ -29,17 +29,18 @@ namespace Ace.Networking
         private TimeSpan? _receiveTimeout;
         private TimeSpan? _receiveTimeoutCheck;
         private volatile bool _shuttingDown;
-        protected ISslStreamFactory SslFactory;
 
-        public TcpServer(IPEndPoint endpoint, ProtocolConfiguration configuration, ISslStreamFactory sslFactory = null, IInternalServiceManager services = null)
+        public TcpServer(IPEndPoint endpoint, IConnectionBuilder connectionBuilder,
+            IInternalServiceManager<IServer> services = null)
         {
             Connections = new ConcurrentDictionary<long, IConnection>();
             Endpoint = endpoint;
-            Configuration = configuration;
+            ConnectionBuilder = connectionBuilder.UseDispatcher(Con_DispatchPayload);
             _timer = new Timer(Timer_Tick, null, 0, System.Threading.Timeout.Infinite);
-            SslFactory = sslFactory;
-            _services = services ?? BasicServiceManager.Empty;
+            _services = services ?? ServicesManager<IServer>.Empty;
         }
+
+        protected IConnectionBuilder ConnectionBuilder { get; }
 
         /// <summary>
         ///     Triggered whenever a new client connects.
@@ -75,16 +76,14 @@ namespace Ace.Networking
 
         public SslMode SslMode => Configuration.SslMode;
 
-        private readonly IInternalServiceManager _services;
-        public IServiceManager Services => _services;
-
         public IPEndPoint Endpoint { get; protected set; }
         public ConcurrentDictionary<long, IConnection> Connections { get; }
 
         public ProtocolConfiguration Configuration { get; protected set; }
+        public IServiceManager<IServer> Services => _services;
         public event ClientAcceptedHandler ClientAccepted;
-        public event GlobalPayloadHandler PayloadReceived;
         public event DisconnectHandler ClientDisconnected;
+        public event GlobalPayloadHandler PayloadReceived;
 
         /// <summary>
         ///     Triggers after a connection has been idle for the specified TimeSpan (<see cref="ReceiveTimeout" />)
@@ -98,10 +97,7 @@ namespace Ace.Networking
 
         private void Timer_Tick(object state)
         {
-            if (!ReceiveTimeout.HasValue || !_receiveTimeoutCheck.HasValue)
-            {
-                return;
-            }
+            if (!ReceiveTimeout.HasValue || !_receiveTimeoutCheck.HasValue) return;
             var now = DateTime.Now;
             foreach (var connection in Connections)
             {
@@ -115,14 +111,14 @@ namespace Ace.Networking
                     {
                         // ignored
                     }
+
                     /* Removing values while iterating is unsafe,
                      * but it's handled by ConcurrentDictionary */
                     continue;
                 }
+
                 if (now.Subtract(connection.Value.LastReceived) >= ReceiveTimeout.Value)
-                {
                     IdleTimeout?.Invoke(connection.Value);
-                }
             }
 
             Timeout?.Invoke();
@@ -132,18 +128,12 @@ namespace Ace.Networking
 
         public virtual void Start()
         {
-            if (Endpoint == null)
-            {
-                throw new InvalidOperationException("Invalid endpoint");
-            }
-            if (_listener != null)
-            {
-                throw new InvalidOperationException("Already listening");
-            }
-            if (SslMode != SslMode.None && SslFactory == null)
+            if (Endpoint == null) throw new InvalidOperationException("Invalid endpoint");
+            if (_listener != null) throw new InvalidOperationException("Already listening");
+            /*if (SslMode != SslMode.None && SslFactory == null)
             {
                 throw new SslException("Missing SSL certificate", null);
-            }
+            }*/
 
             _shuttingDown = false;
 
@@ -153,15 +143,11 @@ namespace Ace.Networking
             _listener.Start();
 
             _listenerTask = Task.Factory.StartNew(Accept, TaskCreationOptions.LongRunning);
-            
         }
 
         public virtual void Stop()
         {
-            if (_listener == null)
-            {
-                throw new InvalidOperationException("Server has not been started");
-            }
+            if (_listener == null) throw new InvalidOperationException("Server has not been started");
             _shuttingDown = true;
             _services.Detach(this);
 
@@ -170,7 +156,6 @@ namespace Ace.Networking
             _listener = null;
 
             foreach (var connection in Connections)
-            {
                 try
                 {
                     connection.Value?.Close();
@@ -179,23 +164,20 @@ namespace Ace.Networking
                 {
                     // ignored
                 }
-            }
+
             Connections.Clear();
         }
 
         public virtual void Join()
         {
             if (_listenerTask == null || _shuttingDown)
-            {
                 throw new InvalidOperationException("Server has not been started");
-            }
             _listenerTask.GetAwaiter().GetResult();
         }
 #pragma warning disable CS4014 // Unneccessary 'await' on new task
         private async void Accept()
         {
             while (!_shuttingDown)
-            {
                 try
                 {
                     var client = await _listener.AcceptTcpClientAsync();
@@ -205,20 +187,19 @@ namespace Ace.Networking
                 {
                     // ignored
                 }
-            }
         }
 #pragma warning restore CS4014
 
         private void OnClientConnect(TcpClient client)
         {
-            var con = new Connection(client, Configuration, SslFactory);
+            var con = ConnectionBuilder.Build(client);
+
             try
             {
                 con.Initialize();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[{con.Identifier}] {ex.Message}");
                 con.Close();
                 return;
             }
@@ -231,9 +212,7 @@ namespace Ace.Networking
             }
 
 
-            con.PayloadDispatchHandler += Con_DispatchPayload;
-            con.Disconnected += Con_Disconnected;
-            con.LastReceived = DateTime.Now;
+            con.ClientDisconnected += Con_Disconnected;
             Connections.TryAdd(con.Identifier, con);
             OnClientAccepted(con);
         }
@@ -253,6 +232,7 @@ namespace Ace.Networking
             {
                 // ignored
             }
+
             Connections.TryRemove(connection.Identifier, out _);
         }
 
@@ -268,6 +248,7 @@ namespace Ace.Networking
             {
                 // ignored
             }
+
             //TODO: Inconsistencies
         }
     }

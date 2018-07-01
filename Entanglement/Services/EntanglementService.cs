@@ -10,7 +10,7 @@ using Ace.Networking.Interfaces;
 
 namespace Ace.Networking.Entanglement.Services
 {
-    public class EntanglementService : IEntanglementService
+    public class EntanglementService : IEntanglementHostService
     {
         protected ConcurrentDictionary<Guid /*InterfaceId*/, Guid /*Eid*/> GlobalObjectMap =
             new ConcurrentDictionary<Guid, Guid>();
@@ -27,29 +27,36 @@ namespace Ace.Networking.Entanglement.Services
             ScopedObjectMap =
                 new ConcurrentDictionary<IConnection, ConcurrentDictionary<Guid, Guid>>();
 
-        protected HashSet<IConnectionDispatcherInteface> BoundInterfaces { get; private set; } =
-            new HashSet<IConnectionDispatcherInteface>();
+
+        protected HashSet<ICommon> BoundInterfaces { get; } =
+            new HashSet<ICommon>();
 
         public bool IsActive => BoundInterfaces.Count > 0;
 
-        public void Attach(IConnectionDispatcherInteface server)
+        public void Attach(ICommon server)
         {
             if (BoundInterfaces.Contains(server)) return;
             BoundInterfaces.Add(server);
+
+            server.ClientDisconnected += Server_ClientDisconnected;
+
             server.OnRequest<ExecuteMethod>(OnRequestExecuteMethodResult);
             server.OnRequest<EntangleRequest>(OnRequestEntangle);
+
             Console.WriteLine("Entanglement service online!");
         }
 
-        public void Detach(IConnectionDispatcherInteface server)
+        public void Detach(ICommon server)
         {
             if (!BoundInterfaces.Remove(server)) return;
-            
+
+            server.ClientDisconnected -= Server_ClientDisconnected;
+
             server.OffRequest<ExecuteMethod>(OnRequestExecuteMethodResult);
             server.OffRequest<EntangleRequest>(OnRequestEntangle);
         }
 
-        public EntangledHostedObjectBase GetObject(Guid eid)
+        public EntangledHostedObjectBase GetHostedObject(Guid eid)
         {
             return Objects.TryGetValue(eid, out var obj) ? obj : null;
         }
@@ -63,13 +70,28 @@ namespace Ace.Networking.Entanglement.Services
         }
 
 
-        public void Register<TBase, T>(EntanglementAccess access) where TBase : class, IEntangledObject
+        public IEntanglementHostService Register<TBase, T>(EntanglementAccess access)
+            where TBase : class, IEntangledObject
             where T : EntangledHostedObjectBase, TBase
         {
             var guid = typeof(TBase).GetTypeInfo().GUID;
             if (!Interfaces.TryAdd(guid,
-                new InterfaceEntry {Access = access, Type = typeof(T), InterfaceId = guid, InterfaceDescriptor = InterfaceDescriptor.Get(typeof(TBase))}))
+                new InterfaceEntry
+                {
+                    Access = access,
+                    Type = typeof(T),
+                    InterfaceId = guid,
+                    InterfaceDescriptor = InterfaceDescriptor.Get(typeof(TBase))
+                }))
                 Interfaces[guid].Access = access;
+            return this;
+        }
+
+        private void Server_ClientDisconnected(IConnection connection, Exception exception)
+        {
+            if (ScopedObjectMap.TryRemove(connection, out var objects))
+                foreach (var obj in objects)
+                    Objects.TryRemove(obj.Value, out _);
         }
 
         protected Guid? GetExistingEid(InterfaceEntry ie, IConnection scope = null)
@@ -93,7 +115,7 @@ namespace Ace.Networking.Entanglement.Services
 
         protected Guid? CreateInstance(InterfaceEntry ie, IConnection scope = null)
         {
-            if ((ie.Access == EntanglementAccess.Manual) && scope != null) return null;
+            if (ie.Access == EntanglementAccess.Manual && scope != null) return null;
             if (ie.Access == EntanglementAccess.Scoped && (scope == null || !scope.Connected)) return null;
             if (GetExistingEid(ie, scope).HasValue) return null;
 

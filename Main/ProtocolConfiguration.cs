@@ -9,8 +9,10 @@ using Ace.Networking.Serializers;
 
 namespace Ace.Networking
 {
-    public abstract class ProtocolConfiguration
+    public class ProtocolConfiguration
     {
+        public static ProtocolConfiguration Instance = new ProtocolConfiguration();
+
         protected volatile bool IsInitialized;
 
         public ProtocolConfiguration(IPayloadEncoder encoder, IPayloadDecoder decoder,
@@ -24,7 +26,7 @@ namespace Ace.Networking
             Initialize();
         }
 
-        protected ProtocolConfiguration()
+        public ProtocolConfiguration()
         {
             var serializer = new MsgPackSerializer();
             PayloadEncoder = new MicroProtocol.MicroEncoder(serializer.Clone());

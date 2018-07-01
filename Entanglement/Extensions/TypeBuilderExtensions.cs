@@ -1,15 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
 
 namespace Ace.Networking.Entanglement.Extensions
 {
     public static class TypeBuilderExtensions
     {
-        public static void FillBaseConstructors(this TypeBuilder t, Type baseType, BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
+        public static void FillBaseConstructors(this TypeBuilder t, Type baseType,
+            BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
         {
             var ctors = baseType.GetConstructors(flags);
             foreach (var ctor in ctors)
@@ -19,10 +18,7 @@ namespace Ace.Networking.Entanglement.Extensions
                     par?.Select(p => p.ParameterType).ToArray() ?? null);
                 var il = c.GetILGenerator();
 
-                for (byte ld = 0; ld < (par?.Length??0)+1; ld++)
-                {
-                    il.EmitLdarg(ld);
-                }
+                for (byte ld = 0; ld < (par?.Length ?? 0) + 1; ld++) il.EmitLdarg(ld);
 
                 il.Emit(OpCodes.Call, ctor);
                 il.Emit(OpCodes.Nop);
@@ -30,9 +26,9 @@ namespace Ace.Networking.Entanglement.Extensions
                 il.Emit(OpCodes.Ret);
             }
         }
+
         public static void EmitLdarg(this ILGenerator il, byte i)
         {
-            
             switch (i)
             {
                 case 0:
@@ -55,7 +51,6 @@ namespace Ace.Networking.Entanglement.Extensions
 
         public static void EmitLdci4(this ILGenerator il, byte i)
         {
-            
             switch (i)
             {
                 case 0:
@@ -91,6 +86,4 @@ namespace Ace.Networking.Entanglement.Extensions
             }
         }
     }
-
-
 }

@@ -1,13 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Ace.Networking.Interfaces;
+﻿using Ace.Networking.Interfaces;
 
 namespace Ace.Networking.Services
 {
-    public interface IAttachable
+    public interface IAttachable<in TInterface> where TInterface : class, ICommon
     {
-        void Attach(IConnectionDispatcherInteface connection);
-        void Detach(IConnectionDispatcherInteface connection);
+        void Attach(TInterface connection);
+        void Detach(TInterface connection);
     }
 }

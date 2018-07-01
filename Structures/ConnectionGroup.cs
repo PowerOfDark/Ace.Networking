@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Ace.Networking.Handlers;
 using Ace.Networking.Interfaces;
@@ -11,12 +9,7 @@ namespace Ace.Networking.Structures
     public class ConnectionGroup : IConnectionGroup
     {
         private readonly HashSet<IConnection> _clients = new HashSet<IConnection>();
-        public IEnumerable<IConnection> Clients => _clients;
-
-        protected void OnDisconnected(IConnection connection, Exception ex)
-        {
-            Disconnected?.Invoke(connection, ex);
-        }
+        public IReadOnlyCollection<IConnection> Clients => _clients;
 
         public void AddClient(IConnection client)
         {
@@ -25,7 +18,7 @@ namespace Ace.Networking.Structures
                 if (!_clients.Contains(client))
                 {
                     _clients.Add(client);
-                    client.Disconnected += OnDisconnected;
+                    client.ClientDisconnected += OnDisconnected;
                 }
             }
         }
@@ -34,10 +27,7 @@ namespace Ace.Networking.Structures
         {
             lock (_clients)
             {
-                foreach (var client in _clients)
-                {
-                    client.Close();
-                }
+                foreach (var client in _clients) client.Close();
             }
         }
 
@@ -55,10 +45,11 @@ namespace Ace.Networking.Structures
             {
                 if (_clients.Remove(client))
                 {
-                    client.Disconnected -= OnDisconnected;
+                    client.ClientDisconnected -= OnDisconnected;
                     return true;
                 }
             }
+
             return false;
         }
 
@@ -68,9 +59,8 @@ namespace Ace.Networking.Structures
             lock (_clients)
             {
                 foreach (var client in _clients)
-                {
-                    tasks.Add(client.Send<T>(data));
-                }
+                    if (client.Connected)
+                        tasks.Add(client.Send(data));
             }
 
             return Task.WhenAll(tasks);
@@ -81,22 +71,21 @@ namespace Ace.Networking.Structures
             lock (_clients)
             {
                 foreach (var client in _clients)
-                {
-                    client.OnRequest<T>(handler);
-                }
+                    if (client.Connected)
+                        client.OnRequest<T>(handler);
             }
         }
 
         public bool OffRequest<T>(PayloadHandlerDispatcherBase.RequestHandler handler)
         {
-            bool ret = false;
+            var ret = false;
             lock (_clients)
             {
                 foreach (var client in _clients)
-                {
-                    ret |= client.OffRequest<T>(handler);
-                }
+                    if (client.Connected)
+                        ret |= client.OffRequest<T>(handler);
             }
+
             return ret;
         }
 
@@ -105,25 +94,30 @@ namespace Ace.Networking.Structures
             lock (_clients)
             {
                 foreach (var client in _clients)
-                {
-                    client.On<T>(handler);
-                }
+                    if (client.Connected)
+                        client.On(handler);
             }
         }
 
         public bool Off<T>(PayloadHandlerDispatcherBase.GenericPayloadHandler<T> handler)
         {
-            bool ret = false;
+            var ret = false;
             lock (_clients)
             {
                 foreach (var client in _clients)
-                {
-                    ret |= client.Off<T>(handler);
-                }
+                    if (client.Connected)
+                        ret |= client.Off(handler);
             }
+
             return ret;
         }
 
-        public event Connection.DisconnectHandler Disconnected;
+        public event Connection.DisconnectHandler ClientDisconnected;
+
+        protected void OnDisconnected(IConnection connection, Exception ex)
+        {
+            RemoveClient(connection);
+            ClientDisconnected?.Invoke(connection, ex);
+        }
     }
 }

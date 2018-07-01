@@ -44,26 +44,24 @@ namespace Ace.Networking.MicroProtocol.SSL
         ///     Build a new SSL steam.
         /// </summary>
         /// <returns>Stream which is ready to be used (must have been validated)</returns>
-        public SslStream Build(Connection connection)
+        public SslStream Build(ISslContainer connection)
         {
             connection.SslCertificates = new SslCertificatePair {Certificate = Certificate};
             var stream = new SslStream(connection.Client.GetStream(), true,
-                (s, cert, chain, err) => OnRemoteCertificateValidation(connection, cert, chain, err), OnCertificateSelection);
+                (s, cert, chain, err) => OnRemoteCertificateValidation(connection, cert, chain, err),
+                OnCertificateSelection);
 
             try
             {
                 X509CertificateCollection certificates = null;
-                if (Certificate != null)
-                {
-                    certificates = new X509CertificateCollection(new[] {Certificate});
-                }
+                if (Certificate != null) certificates = new X509CertificateCollection(new[] {Certificate});
 
                 var task = stream.AuthenticateAsClientAsync(CommonName, certificates, Protocols, false);
                 task.Wait();
             }
             catch (IOException err)
             {
-                throw new SslException("Failed to authenticate " + connection.Socket.RemoteEndPoint, err);
+                throw new SslException("Failed to authenticate", err);
             }
             catch (ObjectDisposedException err)
             {
@@ -71,13 +69,14 @@ namespace Ace.Networking.MicroProtocol.SSL
             }
             catch (AuthenticationException err)
             {
-                throw new SslException("Failed to authenticate " + connection.Socket.RemoteEndPoint, err);
+                throw new SslException("Failed to authenticate", err);
             }
 
             return stream;
         }
 
-        protected X509Certificate OnCertificateSelection(object sender, string targetHost, X509CertificateCollection localCertificates,
+        protected X509Certificate OnCertificateSelection(object sender, string targetHost,
+            X509CertificateCollection localCertificates,
             X509Certificate remoteCertificate, string[] acceptableIssuers)
         {
             return ((localCertificates?.Count ?? 0) > 0 ? localCertificates[0] : null) ?? Certificate;
@@ -92,11 +91,12 @@ namespace Ace.Networking.MicroProtocol.SSL
         /// <param name="chain">The chain.</param>
         /// <param name="sslpolicyerrors">The sslpolicyerrors.</param>
         /// <returns><c>true</c> if the certificate will be allowed, otherwise <c>false</c>.</returns>
-        protected virtual bool OnRemoteCertificateValidation(Connection sender, X509Certificate certificate, X509Chain chain,
+        protected virtual bool OnRemoteCertificateValidation(ISslContainer sender, X509Certificate certificate,
+            X509Chain chain,
             SslPolicyErrors sslpolicyerrors)
         {
-            sender.SslCertificates.RemoteCertificate = new BasicCertificateInfo(certificate);
-            sender.SslCertificates.RemotePolicyErrors = sslpolicyerrors;
+            ((SslCertificatePair) sender.SslCertificates).RemoteCertificate = new BasicCertificateInfo(certificate);
+            ((SslCertificatePair) sender.SslCertificates).RemotePolicyErrors = sslpolicyerrors;
             return sslpolicyerrors == SslPolicyErrors.None;
             //return (Certificate != null && certificate == null) || (Certificate == null && certificate != null);
         }
