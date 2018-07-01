@@ -101,7 +101,8 @@ namespace Ace.Networking.Serializers
                     .Where(t =>
                     {
                         var ti = t.GetTypeInfo();
-                        return ti.GetCustomAttribute<MessagePackObjectAttribute>() != null || ti.GetCustomAttribute<ProtoContractAttribute>() != null;
+                        return ti.GetCustomAttribute<MessagePackObjectAttribute>() != null ||
+                               ti.GetCustomAttribute<ProtoContractAttribute>() != null;
                     });
                 foreach (var type in types)
                     Types[type.FullName] = type;

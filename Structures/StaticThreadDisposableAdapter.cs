@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 
 namespace Ace.Networking.Structures
@@ -9,7 +7,6 @@ namespace Ace.Networking.Structures
     public class StaticThreadDisposableAdapter<T> : IDisposable where T : IDisposable
     {
         private static readonly ConcurrentDictionary<int, T> Map = new ConcurrentDictionary<int, T>();
-        public T Item { get; }
 
         public StaticThreadDisposableAdapter(T item)
         {
@@ -17,13 +14,16 @@ namespace Ace.Networking.Structures
             Map.TryAdd(Thread.CurrentThread.ManagedThreadId, item);
         }
 
+        public T Item { get; }
+
         public static T Get()
         {
             return Map[Thread.CurrentThread.ManagedThreadId];
         }
 
         #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
+
+        private bool disposedValue; // To detect redundant calls
 
         protected virtual void Dispose(bool disposing)
         {
@@ -57,6 +57,7 @@ namespace Ace.Networking.Structures
             // TODO: uncomment the following line if the finalizer is overridden above.
             // GC.SuppressFinalize(this);
         }
+
         #endregion
     }
 }

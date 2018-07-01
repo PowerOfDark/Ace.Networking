@@ -6,7 +6,8 @@ namespace Ace.Networking.Helpers
 {
     public static class TaskHelper
     {
-        public static TaskCompletionSource<T> CreateTaskCompletionSource<T>(object state = null, TimeSpan? timeout = null)
+        public static TaskCompletionSource<T> CreateTaskCompletionSource<T>(object state = null,
+            TimeSpan? timeout = null)
         {
             var tcs = new TaskCompletionSource<T>(state);
             if (timeout.HasValue)
@@ -18,6 +19,7 @@ namespace Ace.Networking.Helpers
                     task.TrySetCanceled();
                 }, tcs);
             }
+
             return tcs;
         }
     }

@@ -15,15 +15,10 @@ namespace Ace.Networking.MicroProtocol.Structures
         /// <exception cref="System.ArgumentOutOfRangeException">offset;Offset+Count must be less than the buffer length.</exception>
         public BufferSlice(byte[] buffer, int offset, int count)
         {
-            if (buffer == null)
-            {
-                throw new ArgumentNullException(nameof(buffer));
-            }
+            if (buffer == null) throw new ArgumentNullException(nameof(buffer));
             if (offset + count > buffer.Length)
-            {
                 throw new ArgumentOutOfRangeException(nameof(offset), offset,
                     "Offset+Count must be less than the buffer length.");
-            }
 
             Capacity = count;
             Offset = offset;

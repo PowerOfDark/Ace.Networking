@@ -10,6 +10,7 @@
                 BitConverter2.GetBytes(arg, target, offset + written);
                 written += sizeof(int);
             }
+
             return written;
         }
     }

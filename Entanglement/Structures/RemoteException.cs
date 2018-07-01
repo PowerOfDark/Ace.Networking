@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Ace.Networking.Entanglement.Structures
 {
@@ -8,12 +6,10 @@ namespace Ace.Networking.Entanglement.Structures
     {
         public RemoteException()
         {
-
         }
 
         public RemoteException(RemoteExceptionAdapter adapter) : base(adapter.Message)
         {
-
         }
     }
 }

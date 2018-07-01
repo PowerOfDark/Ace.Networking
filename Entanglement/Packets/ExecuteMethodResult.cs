@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Text;
+﻿using System.Runtime.InteropServices;
 using Ace.Networking.Entanglement.Structures;
 using MessagePack;
 using ProtoBuf;
@@ -13,15 +10,8 @@ namespace Ace.Networking.Entanglement.Packets
     [MessagePackObject]
     public class ExecuteMethodResult
     {
-        [Key(0)]
-        public RemoteExceptionAdapter ExceptionAdapter { get; set; }
-        [Key(1)]
-        public object Data { get; set; }
+        [Key(0)] public RemoteExceptionAdapter ExceptionAdapter { get; set; }
 
-
-        public ExecuteMethodResult()
-        {
-
-        }
+        [Key(1)] public object Data { get; set; }
     }
 }

@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Ace.Networking.Entanglement
+﻿namespace Ace.Networking.Entanglement
 {
-    class ReflectionCache
+    internal class ReflectionCache
     {
     }
 }

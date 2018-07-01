@@ -12,9 +12,10 @@ namespace Ace.Networking.Handlers
             Request = request;
         }
 
+        internal int RequestId { get; }
+
         public object Request { get; }
         public IConnection Connection { get; }
-        internal int RequestId { get; }
 
         public Task SendResponse<T>(T response)
         {
@@ -28,6 +29,7 @@ namespace Ace.Networking.Handlers
                 task = null;
                 return false;
             }
+
             task = Connection.EnqueueSendResponse(RequestId, response);
             return true;
         }

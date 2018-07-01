@@ -28,10 +28,7 @@ namespace Ace.Networking.Structures
         public void Add(TItem item)
         {
             Container.AddLast(item);
-            if (Container.Count > Barrier)
-            {
-                Container.RemoveFirst();
-            }
+            if (Container.Count > Barrier) Container.RemoveFirst();
         }
     }
 }

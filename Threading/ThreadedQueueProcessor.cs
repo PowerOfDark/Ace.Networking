@@ -65,16 +65,14 @@ namespace Ace.Networking.Threading
 
         public void Initialize()
         {
-            if (ThreadCount != 0)
-            {
-                return;
-            }
+            if (ThreadCount != 0) return;
             SendQueues = new ConcurrentQueue<ThreadedQueueItem<TItem>>[Parameters.MaxThreads];
             for (var i = 0; i < Parameters.MaxThreads; i++)
             {
                 SendQueues[i] = new ConcurrentQueue<ThreadedQueueItem<TItem>>();
                 ThreadList.Add(null);
             }
+
             if (Parameters.MaxThreads == Parameters.MinThreads)
             {
                 // light
@@ -90,10 +88,7 @@ namespace Ace.Networking.Threading
 
         public void NewClient()
         {
-            if (_timer == null)
-            {
-                Initialize();
-            }
+            if (_timer == null) Initialize();
             Interlocked.Increment(ref ClientCount);
         }
 
@@ -102,15 +97,13 @@ namespace Ace.Networking.Threading
             _timer?.Dispose();
             var tmp = ThreadList.ToList();
             ThreadList.Clear(); // crash every enqueue attempt
-            while (_pending != 0)
-            {
-                Thread.Sleep(2);
-            }
+            while (_pending != 0) Thread.Sleep(2);
             for (var i = 0; i < ThreadCount; i++)
             {
                 tmp[i].Run = false;
                 tmp[i].WaitHandle.Set();
             }
+
             tmp.Clear();
             SendQueues = null;
             ThreadCount = 0;
@@ -131,10 +124,7 @@ namespace Ace.Networking.Threading
             var target = currentThreadCount;
 
             var cc = 0; //_pending;
-            for (var i = 0; i < currentThreadCount; i++)
-            {
-                cc = Math.Max(cc, SendQueues[i].Count);
-            }
+            for (var i = 0; i < currentThreadCount; i++) cc = Math.Max(cc, SendQueues[i].Count);
 
             if (cc >= BoostPeak + Parameters.BoostBarrier &&
                 MonitorTick - LastBoostTick >= Parameters.BoostCooldownTicks)
@@ -142,18 +132,11 @@ namespace Ace.Networking.Threading
                 target += 1;
                 BoostPeak = cc - Parameters.BoostBarrier;
             }
-            if (target < threadsRequired)
-            {
-                target = threadsRequired;
-            }
-            if (target > Parameters.MaxThreads)
-            {
-                target = Parameters.MaxThreads;
-            }
+
+            if (target < threadsRequired) target = threadsRequired;
+            if (target > Parameters.MaxThreads) target = Parameters.MaxThreads;
             if (Parameters.MaxThreadsPerClient.HasValue && target > clients * Parameters.MaxThreadsPerClient.Value)
-            {
                 target = clients;
-            }
 
             var toSpawn = Math.Max(0, target - currentThreadCount);
             if (toSpawn > 0)
@@ -174,19 +157,14 @@ namespace Ace.Networking.Threading
                             var q = SendQueues[i];
                             for (var j = 0; j < items; j++)
                             {
-                                if (!q.TryDequeue(out var item))
-                                {
-                                    continue;
-                                }
+                                if (!q.TryDequeue(out var item)) continue;
                                 SendQueues[Math.Abs(item.Discriminator % tc)].Enqueue(item);
                             }
                         }
+
                         _freeze = false;
                         _modifyHandle.Set();
-                        for (var i = 0; i < tc; i++)
-                        {
-                            ThreadList[i].WaitHandle.Set();
-                        }
+                        for (var i = 0; i < tc; i++) ThreadList[i].WaitHandle.Set();
                     }
                 }
             }
@@ -208,9 +186,7 @@ namespace Ace.Networking.Threading
                                 // if the thread has enqueued jobs or is under start-protection
                                 if (SendQueues[i].Count != 0 || MonitorTick - ThreadList[i].StartTick <=
                                     Parameters.ThreadStartProtectionTicks)
-                                {
                                     continue;
-                                }
 
                                 if (delta < leastWork)
                                 {
@@ -313,14 +289,8 @@ namespace Ace.Networking.Threading
 
         public void Enqueue(TItem item, int discriminator)
         {
-            if (_killing || _freeze)
-            {
-                _modifyHandle.WaitOne();
-            }
-            if (_pending > Parameters.QueueCapacity)
-            {
-                _enqueueHandle.WaitOne();
-            }
+            if (_killing || _freeze) _modifyHandle.WaitOne();
+            if (_pending > Parameters.QueueCapacity) _enqueueHandle.WaitOne();
 
             var i = Math.Abs(discriminator % ThreadCount);
             SendQueues[i].Enqueue(new ThreadedQueueItem<TItem> {Item = item, Discriminator = (ushort) discriminator});
@@ -337,7 +307,6 @@ namespace Ace.Networking.Threading
             var barrier = Parameters.QueueCapacity;
             var cState = true;
             while (data.Run)
-            {
                 if (!_freeze && q.TryDequeue(out var item))
                 {
                     try
@@ -348,6 +317,7 @@ namespace Ace.Networking.Threading
                     {
                         // ignored
                     }
+
                     if (Interlocked.Decrement(ref _pending) <= barrier)
                     {
                         if (!cState)
@@ -364,13 +334,13 @@ namespace Ace.Networking.Threading
                             cState = false;
                         }
                     }
+
                     Interlocked.Increment(ref data.WorkTicks);
                     data.LastWorkTick = MonitorTick;
                 }
                 else
                 {
                     while (!handle.WaitOne(5))
-                    {
                         if (_pending <= barrier)
                         {
                             if (!cState)
@@ -387,22 +357,16 @@ namespace Ace.Networking.Threading
                                 cState = false;
                             }
                         }
-                    }
                 }
-            }
         }
 
         protected virtual void WorkWrapper(object state)
         {
             var st = (ThreadData) state;
             if (st.Id == 0)
-            {
                 WorkMain(st);
-            }
             else
-            {
                 Work(st);
-            }
         }
 
         private void Work(ThreadData state)
@@ -412,7 +376,6 @@ namespace Ace.Networking.Threading
             var q = SendQueues[data.Id];
             var handle = data.WaitHandle;
             while (data.Run)
-            {
                 if (!_freeze && q.TryDequeue(out var item))
                 {
                     try
@@ -423,6 +386,7 @@ namespace Ace.Networking.Threading
                     {
                         // ignored
                     }
+
                     Interlocked.Decrement(ref _pending);
                     Interlocked.Increment(ref data.WorkTicks);
                     data.LastWorkTick = MonitorTick;
@@ -431,7 +395,7 @@ namespace Ace.Networking.Threading
                 {
                     handle.WaitOne(5);
                 }
-            }
+
             //Console.WriteLine($"Thread {Thread.CurrentThread.ManagedThreadId} killed");
         }
     }

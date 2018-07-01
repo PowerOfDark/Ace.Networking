@@ -31,10 +31,7 @@ namespace Ace.Networking.ProtoBuf
 
         public object Deserialize(byte[] contentType, Stream source, out Type resolvedType)
         {
-            if (!IsValidContentType(contentType))
-            {
-                throw new NotSupportedException("Invalid decoder");
-            }
+            if (!IsValidContentType(contentType)) throw new NotSupportedException("Invalid decoder");
             var guidBytes = new byte[16];
             Buffer.BlockCopy(contentType, ContentType.Length, guidBytes, 0, 16);
             var guid = new Guid(guidBytes);
@@ -51,7 +48,7 @@ namespace Ace.Networking.ProtoBuf
         public void Serialize(object source, Stream destination, out byte[] contentType)
         {
             var type = source.GetType();
-           
+
             contentType = CreateContentType(type);
             Serializer.NonGeneric.Serialize(destination, source);
         }
@@ -85,10 +82,7 @@ namespace Ace.Networking.ProtoBuf
         {
             var protoAttribute = typeof(ProtoContractAttribute);
             var types = assembly.GetTypes().Where(t => t.GetTypeInfo().GetCustomAttribute(protoAttribute) != null);
-            foreach (var type in types)
-            {
-                RegisterType(type);
-            }
+            foreach (var type in types) RegisterType(type);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -112,7 +106,5 @@ namespace Ace.Networking.ProtoBuf
 
             return b;
         }
-
-
     }
 }

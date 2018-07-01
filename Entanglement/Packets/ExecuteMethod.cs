@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Text;
-using MessagePack;
 using ProtoBuf;
 
 namespace Ace.Networking.Entanglement.Packets
@@ -13,8 +10,6 @@ namespace Ace.Networking.Entanglement.Packets
     {
         public string FullName { get; set; }
         public byte[] SerializedData { get; set; }
-
-        public MethodParameter() { }
     }
 
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
@@ -25,7 +20,5 @@ namespace Ace.Networking.Entanglement.Packets
         public string Method { get; set; }
         public string ReturnValueFullName { get; set; }
         public MethodParameter[] Arguments { get; set; }
-
-        public ExecuteMethod() { }
     }
 }

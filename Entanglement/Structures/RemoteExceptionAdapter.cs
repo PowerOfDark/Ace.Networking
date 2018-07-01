@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Text;
 using MessagePack;
 using ProtoBuf;
 
@@ -12,16 +10,13 @@ namespace Ace.Networking.Entanglement.Structures
     [MessagePackObject]
     public class RemoteExceptionAdapter
     {
-        [Key(0)]
-        public string Message { get; protected set; }
         public RemoteExceptionAdapter()
         {
-
         }
 
         public RemoteExceptionAdapter(string message)
         {
-            this.Message = message;
+            Message = message;
         }
 
         public RemoteExceptionAdapter(string message, Exception innerException)
@@ -34,5 +29,7 @@ namespace Ace.Networking.Entanglement.Structures
                 ex = ex.InnerException;
             }
         }
+
+        [Key(0)] public string Message { get; protected set; }
     }
 }

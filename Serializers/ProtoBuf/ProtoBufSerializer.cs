@@ -34,6 +34,7 @@ namespace Ace.Networking.ProtoBuf
             contentType = CreateContentType(type);
             Serializer.NonGeneric.Serialize(destination, source);
         }
+
         public void Serialize(object source, Stream destination)
         {
             Serializer.NonGeneric.Serialize(destination, source);
@@ -53,10 +54,7 @@ namespace Ace.Networking.ProtoBuf
         /// <exception cref="System.NotSupportedException">Invalid content type</exception>
         public object Deserialize(byte[] contentType, Stream source, out Type resolvedType)
         {
-            if (!IsValidContentType(contentType))
-            {
-                throw new NotSupportedException("Invalid decoder");
-            }
+            if (!IsValidContentType(contentType)) throw new NotSupportedException("Invalid decoder");
             var type = Encoding.UTF8.GetString(contentType, 2, contentType.Length - 2);
             Types.TryGetValue(type, out resolvedType);
 
@@ -94,12 +92,7 @@ namespace Ace.Networking.ProtoBuf
         {
             var types = assembly.GetTypes()
                 .Where(t => t.GetTypeInfo().GetCustomAttribute(typeof(ProtoContractAttribute)) != null);
-            foreach (var type in types)
-            {
-                Types.TryAdd(type.FullName, type);
-            }
+            foreach (var type in types) Types.TryAdd(type.FullName, type);
         }
-
-
     }
 }

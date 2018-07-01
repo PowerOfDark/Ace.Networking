@@ -18,26 +18,18 @@ namespace Ace.Networking.MicroProtocol.SSL
 
         public static string GetAttribute(string str, string key, string fallback = null)
         {
-            if (string.IsNullOrEmpty(str) || string.IsNullOrEmpty(key))
-            {
-                return fallback;
-            }
+            if (string.IsNullOrEmpty(str) || string.IsNullOrEmpty(key)) return fallback;
             var i = str.IndexOf($"{key}=", StringComparison.Ordinal);
-            if (i == -1)
-            {
-                return fallback;
-            }
+            if (i == -1) return fallback;
             i += key.Length + 1;
             var sb = new StringBuilder(str.Length - i);
             while (i < str.Length)
             {
                 var c = str[i++];
-                if (c == ',')
-                {
-                    break;
-                }
+                if (c == ',') break;
                 sb.Append(c);
             }
+
             return sb.ToString();
         }
 

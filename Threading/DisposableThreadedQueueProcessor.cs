@@ -3,7 +3,8 @@ using Ace.Networking.Interfaces;
 
 namespace Ace.Networking.Threading
 {
-    public class DisposableThreadedQueueProcessor<TItem, TDisposable> : ThreadedQueueProcessor<TItem> where TDisposable : IDisposable
+    public class DisposableThreadedQueueProcessor<TItem, TDisposable> : ThreadedQueueProcessor<TItem>
+        where TDisposable : IDisposable
     {
         protected Func<ThreadData, TDisposable> _createContext;
 

@@ -20,6 +20,7 @@ namespace Ace.Networking.Entanglement.Reflection
                             new AssemblyName($"Ace_{nameof(DynamicAssembly)}"),
                             AssemblyBuilderAccess.RunAndCollect);
                 }
+
                 return _assembly;
             }
         }

@@ -17,7 +17,8 @@ namespace Ace.Networking.Handlers
 
         public delegate bool RequestHandler(RequestWrapper request);
 
-        protected ConcurrentDictionary<Type, LinkedList<RequestHandler>> RequestHandlers = new ConcurrentDictionary<Type, LinkedList<RequestHandler>>();
+        protected ConcurrentDictionary<Type, LinkedList<RequestHandler>> RequestHandlers =
+            new ConcurrentDictionary<Type, LinkedList<RequestHandler>>();
 
         protected ConcurrentDictionary<Type, LinkedList<IPayloadHandlerWrapper>> TypeHandlers =
             new ConcurrentDictionary<Type, LinkedList<IPayloadHandlerWrapper>>();
@@ -30,15 +31,13 @@ namespace Ace.Networking.Handlers
 
         protected bool RemoveTypeHandler(Type type, object obj)
         {
-            if (!TypeHandlers.ContainsKey(type))
-            {
-                return false;
-            }
+            if (!TypeHandlers.ContainsKey(type)) return false;
             bool ret;
             lock (TypeHandlers[type])
             {
                 ret = TypeHandlers[type].RemoveFirst(t => t.HandlerEquals(obj));
             }
+
             return ret;
         }
 
@@ -51,8 +50,10 @@ namespace Ace.Networking.Handlers
                 {
                     list.Clear();
                 }
+
                 return true;
             }
+
             return false;
         }
 

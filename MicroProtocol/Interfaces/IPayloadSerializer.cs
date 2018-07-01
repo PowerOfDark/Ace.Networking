@@ -21,7 +21,5 @@ namespace Ace.Networking.MicroProtocol.Interfaces
         byte[] CreateContentType(Type type);
 
         void RegisterAssembly(Assembly assembly);
-
-
     }
 }

@@ -1,5 +1,4 @@
-﻿using System.Collections.Concurrent;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading;
 
 namespace Ace.Networking.Structures
@@ -37,10 +36,7 @@ namespace Ace.Networking.Structures
         {
             lock (_container)
             {
-                if (Count >= Barrier)
-                {
-                    _lock.WaitOne();
-                }
+                if (Count >= Barrier) _lock.WaitOne();
                 _container.Enqueue(item);
             }
         }
@@ -51,15 +47,14 @@ namespace Ace.Networking.Structures
             {
                 if (_container.Count == 0)
                 {
-                    item = default(T);
+                    item = default;
                     return false;
                 }
+
                 item = _container.Dequeue();
             }
-            if (Count == Barrier - 1)
-            {
-                _lock.Set();
-            }
+
+            if (Count == Barrier - 1) _lock.Set();
             return true;
         }
     }

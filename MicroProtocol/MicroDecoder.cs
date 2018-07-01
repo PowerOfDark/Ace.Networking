@@ -19,8 +19,6 @@ namespace Ace.Networking.MicroProtocol
         private readonly MemoryStream _contentStream = new MemoryStream();
         private readonly byte[] _header = new byte[short.MaxValue];
 
-        public IPayloadSerializer Serializer { get; private set; }
-
         private int _bytesLeftForCurrentState;
         private int _bytesLeftInSocketBuffer;
         private BasicHeader _headerObject;
@@ -44,6 +42,8 @@ namespace Ace.Networking.MicroProtocol
             _bytesLeftForCurrentState = sizeof(short);
             _stateMethod = ReadHeaderLength;
         }
+
+        public IPayloadSerializer Serializer { get; }
 
         /// <summary>
         ///     Reset the decoder so that we can parse a new message
@@ -72,10 +72,7 @@ namespace Ace.Networking.MicroProtocol
             get => _messageReceived;
             set
             {
-                if (value == null)
-                {
-                    value = (h, o, t) => { };
-                }
+                if (value == null) value = (h, o, t) => { };
 
                 _messageReceived = value;
             }
@@ -86,10 +83,7 @@ namespace Ace.Networking.MicroProtocol
             get => _rawDataReceived;
             set
             {
-                if (value == null)
-                {
-                    value = (i, s, stream) => null;
-                }
+                if (value == null) value = (i, s, stream) => null;
                 _rawDataReceived = value;
             }
         }
@@ -118,10 +112,7 @@ namespace Ace.Networking.MicroProtocol
 
         private bool ReadHeaderLength(SocketBuffer e)
         {
-            if (!CopyBytes(e))
-            {
-                return false;
-            }
+            if (!CopyBytes(e)) return false;
 
             _headerSize = BitConverter.ToUInt16(_header, 0);
             _bytesLeftForCurrentState = _headerSize - sizeof(ushort);
@@ -132,10 +123,7 @@ namespace Ace.Networking.MicroProtocol
 
         private bool CopyBytes(SocketBuffer e)
         {
-            if (_bytesLeftInSocketBuffer == 0)
-            {
-                return false;
-            }
+            if (_bytesLeftInSocketBuffer == 0) return false;
 
             if (_bytesLeftForCurrentState > 0)
             {
@@ -152,10 +140,7 @@ namespace Ace.Networking.MicroProtocol
 
         private bool ProcessFixedHeader(SocketBuffer e)
         {
-            if (!CopyBytes(e))
-            {
-                return false;
-            }
+            if (!CopyBytes(e)) return false;
 
             _protocolVersion = _header[0];
 
@@ -164,13 +149,9 @@ namespace Ace.Networking.MicroProtocol
             _stateMethod = ProcessContent;
             _bytesLeftForCurrentState = (_headerObject as ContentHeader)?.ContentLength ?? -1;
             if (_headerObject.PacketType == PacketType.RawData)
-            {
                 _bytesLeftForCurrentState = (_headerObject as RawDataHeader)?.ContentLength ?? -1;
-            }
             if (_headerObject.PacketFlag.HasFlag(PacketFlag.NoContent) || _bytesLeftForCurrentState == 0)
-            {
                 _bytesLeftForCurrentState = -1;
-            }
             _headerOffset = 0;
             _contentStream.Position = 0;
             _contentStream.SetLength(0);
@@ -179,14 +160,8 @@ namespace Ace.Networking.MicroProtocol
 
         private bool ProcessContent(SocketBuffer arg)
         {
-            if (_bytesLeftForCurrentState == -1)
-            {
-                goto SKIP_CHECKS;
-            }
-            if (_bytesLeftForCurrentState == 0 || _bytesLeftInSocketBuffer == 0)
-            {
-                return false;
-            }
+            if (_bytesLeftForCurrentState == -1) goto SKIP_CHECKS;
+            if (_bytesLeftForCurrentState == 0 || _bytesLeftInSocketBuffer == 0) return false;
 
             var bytesToCopy = Math.Min(_bytesLeftForCurrentState, _bytesLeftInSocketBuffer);
             _contentStream.Write(arg.Buffer, _socketBufferOffset, bytesToCopy);
@@ -194,10 +169,7 @@ namespace Ace.Networking.MicroProtocol
             _bytesLeftForCurrentState -= bytesToCopy;
             _socketBufferOffset += bytesToCopy;
 
-            if (_bytesLeftForCurrentState > 0)
-            {
-                return false;
-            }
+            if (_bytesLeftForCurrentState > 0) return false;
             SKIP_CHECKS:
 
             _bytesLeftForCurrentState = sizeof(ushort);
@@ -207,10 +179,7 @@ namespace Ace.Networking.MicroProtocol
 
             if (_headerObject.PacketType == PacketType.RawData)
             {
-                if (!(_headerObject is RawDataHeader rawData))
-                {
-                    return false;
-                }
+                if (!(_headerObject is RawDataHeader rawData)) return false;
                 RawDataReceived(rawData.RawDataBufferId, rawData.RawDataSeq, _contentStream);
                 return true;
             }
@@ -220,14 +189,11 @@ namespace Ace.Networking.MicroProtocol
             {
                 var contentType = content.ContentType;
                 var packet = new DefaultContentPacket(content, null);
-                var message = Serializer.Deserialize(contentType, _contentStream, out Type resolvedType);
+                var message = Serializer.Deserialize(contentType, _contentStream, out var resolvedType);
                 packet.Payload = message;
                 packet.Type = resolvedType;
 
-                if (packet.Payload != null)
-                {
-                    PacketReceived(packet.Header, packet.Payload, packet.Type);
-                }
+                if (packet.Payload != null) PacketReceived(packet.Header, packet.Payload, packet.Type);
                 return true;
             }
 

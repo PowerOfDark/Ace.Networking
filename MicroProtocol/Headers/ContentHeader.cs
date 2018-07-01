@@ -22,10 +22,7 @@ namespace Ace.Networking.MicroProtocol.Headers
             var contentTypeLength = BitConverter.ToUInt16(target, offset + Position);
             Position += sizeof(ushort);
             ContentType = new byte[contentTypeLength];
-            for (var i = 0; i < contentTypeLength; i++)
-            {
-                ContentType[i] = target[offset + Position++];
-            }
+            for (var i = 0; i < contentTypeLength; i++) ContentType[i] = target[offset + Position++];
             ContentLength = BitConverter.ToInt32(target, offset + Position);
             Position += sizeof(int);
 
@@ -38,10 +35,7 @@ namespace Ace.Networking.MicroProtocol.Headers
             BitConverter2.GetBytes((short) ContentTypeLength, target, offset + Position);
             Position += sizeof(ushort);
             //Encoding.ASCII.GetBytes(ContentType, 0, ContentTypeLength, target, offset + Position); Position += ContentTypeLength;
-            for (var i = 0; i < ContentTypeLength; i++)
-            {
-                target[offset + Position++] = ContentType[i];
-            }
+            for (var i = 0; i < ContentTypeLength; i++) target[offset + Position++] = ContentType[i];
             BitConverter2.GetBytes(ContentLength, target, offset + Position);
             Position += sizeof(int);
         }
