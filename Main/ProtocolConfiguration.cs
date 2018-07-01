@@ -1,11 +1,11 @@
-﻿using System.Security.Authentication;
+﻿using System.Reflection;
+using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
+using Ace.Networking.MicroProtocol;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.SSL;
-using Ace.Networking.Threading;
-using System.Reflection;
-using Ace.Networking.ProtoBuf;
 using Ace.Networking.Serializers;
+using Ace.Networking.Threading;
 
 namespace Ace.Networking
 {
@@ -29,8 +29,8 @@ namespace Ace.Networking
         public ProtocolConfiguration()
         {
             var serializer = new MsgPackSerializer();
-            PayloadEncoder = new MicroProtocol.MicroEncoder(serializer.Clone());
-            PayloadDecoder = new MicroProtocol.MicroDecoder(serializer.Clone());
+            PayloadEncoder = new MicroEncoder(serializer.Clone());
+            PayloadDecoder = new MicroDecoder(serializer.Clone());
             Initialize();
         }
 
@@ -45,21 +45,17 @@ namespace Ace.Networking
 
         protected virtual void Initialize()
         {
-            if (IsInitialized)
-            {
-                return;
-            }
+            if (IsInitialized) return;
             IsInitialized = true;
 
 
-            PayloadEncoder.Serializer.RegisterAssembly(this.GetType().GetTypeInfo().Assembly);
+            PayloadEncoder.Serializer.RegisterAssembly(GetType().GetTypeInfo().Assembly);
             PayloadEncoder.Serializer.RegisterAssembly(typeof(Connection).GetTypeInfo().Assembly);
             if (PayloadEncoder.Serializer != PayloadDecoder.Serializer)
             {
-                PayloadDecoder.Serializer.RegisterAssembly(this.GetType().GetTypeInfo().Assembly);
+                PayloadDecoder.Serializer.RegisterAssembly(GetType().GetTypeInfo().Assembly);
                 PayloadDecoder.Serializer.RegisterAssembly(typeof(Connection).GetTypeInfo().Assembly);
             }
-
         }
 
         public virtual ClientSslStreamFactory GetClientSslFactory(string targetCommonName = "",

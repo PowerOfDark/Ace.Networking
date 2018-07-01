@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Reflection;
 using System.Threading.Tasks;
-using Ace.Networking.Entanglement.Packets;
-using Ace.Networking.Entanglement.Reflection;
 using Ace.Networking.Entanglement.Services;
 using Ace.Networking.Entanglement.Structures;
 using Ace.Networking.Interfaces;
@@ -20,6 +17,5 @@ namespace Ace.Networking.Entanglement.Extensions
                     $"The supported connection does not have a {nameof(IEntanglementClientService)} service");
             return service.Entangle<T>(eid);
         }
-
     }
 }

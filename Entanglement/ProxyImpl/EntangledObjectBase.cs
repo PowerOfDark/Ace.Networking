@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text;
 using Ace.Networking.Entanglement.Reflection;
 using Ace.Networking.Entanglement.Structures;
 
