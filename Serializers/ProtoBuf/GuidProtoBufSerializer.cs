@@ -89,10 +89,17 @@ namespace Ace.Networking.ProtoBuf
         public static void RegisterType(Type type)
         {
             var guid = type.GetTypeInfo().GUID;
-            Types.TryAdd(guid, type);
+            if (!Types.TryAdd(guid, type))
+            {
+                var conflictingType = Types[guid];
+                if (type != conflictingType)
+                    throw new ArgumentException(
+                        $"Type {type.FullName} and {conflictingType.FullName} have conflicting GUIDs");
+            }
             if (!TypesLookup.TryAdd(type, guid))
             {
                 //TODO: handle collisions (?)
+                // this shouldn't happen
             }
         }
 

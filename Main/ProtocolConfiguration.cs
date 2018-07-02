@@ -4,6 +4,7 @@ using System.Security.Cryptography.X509Certificates;
 using Ace.Networking.MicroProtocol;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.SSL;
+using Ace.Networking.ProtoBuf;
 using Ace.Networking.Serializers;
 using Ace.Networking.Threading;
 

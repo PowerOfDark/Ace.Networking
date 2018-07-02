@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Ace.Networking.Entanglement.Extensions;
 using Ace.Networking.Entanglement.Packets;
 using Ace.Networking.Entanglement.Reflection;
 using Ace.Networking.Entanglement.Structures;
@@ -53,7 +54,8 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             var res = await Host.SendRequest<ExecuteMethod, ExecuteMethodResult>(desc);
             if (res.ExceptionAdapter != null)
                 throw new RemoteException(res.ExceptionAdapter);
-            return (T) res.Data;
+            if (res.SerializedData == null || res.SerializedData.Length == 0) return default;
+            return res.SerializedData.Deserialize<T>(this.Host.Serializer);
         }
 
         public async Task ExecuteMethodVoid(string name, params object[] arg)

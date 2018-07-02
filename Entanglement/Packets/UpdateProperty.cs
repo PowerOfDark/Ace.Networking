@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using ProtoBuf;
 
 namespace Ace.Networking.Entanglement.Packets
 {
-    [ProtoContract]
+    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
     public class PropertyData : IEqualityComparer<PropertyData>
     {
         public string PropertyName { get; set; }
@@ -21,7 +22,8 @@ namespace Ace.Networking.Entanglement.Packets
         }
     }
 
-    [ProtoContract]
+    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+    [Guid("8559B5CA-2A9D-4D26-9FC4-29105C13CCA5")]
     public class UpdateProperties
     {
         public List<PropertyData> Updates { get; set; }

@@ -12,6 +12,6 @@ namespace Ace.Networking.Entanglement.Packets
     {
         [Key(0)] public RemoteExceptionAdapter ExceptionAdapter { get; set; }
 
-        [Key(1)] public object Data { get; set; }
+        [Key(1)] public byte[] SerializedData { get; set; }
     }
 }
