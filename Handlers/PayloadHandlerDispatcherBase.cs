@@ -7,16 +7,10 @@ using Ace.Networking.MicroProtocol.Interfaces;
 
 namespace Ace.Networking.Handlers
 {
+
+
     public abstract class PayloadHandlerDispatcherBase
     {
-        public delegate object GenericPayloadHandler<in T>(IConnection connection, T payload);
-
-        public delegate void GlobalPayloadHandler(IConnection connection, object payload, Type type);
-
-        public delegate object PayloadHandler(IConnection connection, object payload, Type type);
-
-        public delegate bool RequestHandler(RequestWrapper request);
-
         protected ConcurrentDictionary<Type, LinkedList<RequestHandler>> RequestHandlers =
             new ConcurrentDictionary<Type, LinkedList<RequestHandler>>();
 

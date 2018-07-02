@@ -7,12 +7,12 @@ namespace Ace.Networking.Handlers
 {
     public class PayloadHandlerWrapper : IPayloadHandlerWrapper
     {
-        public PayloadHandlerWrapper(PayloadHandlerDispatcherBase.PayloadHandler handler)
+        public PayloadHandlerWrapper(PayloadHandler handler)
         {
             Handler = handler;
         }
 
-        public PayloadHandlerDispatcherBase.PayloadHandler Handler { get; set; }
+        public PayloadHandler Handler { get; set; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public object Invoke(IConnection connection, object obj, Type type)

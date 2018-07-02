@@ -182,6 +182,13 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             }
         }
 
+        public void SendState(IRequestWrapper request)
+        {
+            request.SendResponse(Context.All.ContainsClient(request.Connection)
+                ? GetAllProperties(request.Connection)
+                : new UpdateProperties() {Eid = this.Eid, Updates = null});
+        }
+
         public void AddClient(IConnection client)
         {
             Context?.All.AddClient(client);

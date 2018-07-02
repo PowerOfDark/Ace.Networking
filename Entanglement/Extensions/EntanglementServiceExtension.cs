@@ -10,8 +10,8 @@ namespace Ace.Networking.Entanglement.Extensions
         public static IServicesBuilder<T> AddEntanglementHost<T>(this IServicesBuilder<T> services,
             Action<IEntanglementHostService> config = null) where T : class, ICommon
         {
-            var instance = new EntanglementService();
-            services.Add<IEntanglementHostService, EntanglementService>(instance);
+            var instance = new EntanglementHostService();
+            services.Add<IEntanglementHostService, EntanglementHostService>(instance);
             config?.Invoke(instance);
             return services;
         }

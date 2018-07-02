@@ -6,11 +6,12 @@ using Ace.Networking.Entanglement.Packets;
 using Ace.Networking.Entanglement.ProxyImpl;
 using Ace.Networking.Entanglement.Reflection;
 using Ace.Networking.Entanglement.Structures;
+using Ace.Networking.Handlers;
 using Ace.Networking.Interfaces;
 
 namespace Ace.Networking.Entanglement.Services
 {
-    public class EntanglementService : IEntanglementHostService
+    public class EntanglementHostService : IEntanglementHostService
     {
         protected ConcurrentDictionary<Guid /*InterfaceId*/, Guid /*Eid*/> GlobalObjectMap =
             new ConcurrentDictionary<Guid, Guid>();
@@ -42,7 +43,7 @@ namespace Ace.Networking.Entanglement.Services
 
             server.OnRequest<ExecuteMethod>(OnRequestExecuteMethodResult);
             server.OnRequest<EntangleRequest>(OnRequestEntangle);
-
+            server.OnRequest<UpdateRequest>(OnRequestUpdate);
             Console.WriteLine("Entanglement service online!");
         }
 
@@ -54,6 +55,7 @@ namespace Ace.Networking.Entanglement.Services
 
             server.OffRequest<ExecuteMethod>(OnRequestExecuteMethodResult);
             server.OffRequest<EntangleRequest>(OnRequestEntangle);
+            server.OffRequest<UpdateRequest>(OnRequestUpdate);
         }
 
         public EntangledHostedObjectBase GetHostedObject(Guid eid)
@@ -200,6 +202,13 @@ namespace Ace.Networking.Entanglement.Services
             Console.WriteLine("On request execute method result");
             var cmd = (ExecuteMethod) wrapper.Request;
             if (Objects.TryGetValue(cmd.Eid, out var obj)) obj.Execute(wrapper);
+            return true;
+        }
+
+        private bool OnRequestUpdate(RequestWrapper request)
+        {
+            var req = (UpdateRequest) request.Request;
+            if (Objects.TryGetValue(req.Eid, out var obj)) obj.SendState(request);
             return true;
         }
     }

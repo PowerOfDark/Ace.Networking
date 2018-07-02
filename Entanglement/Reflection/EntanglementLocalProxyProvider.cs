@@ -58,11 +58,8 @@ namespace Ace.Networking.Entanglement.Reflection
         private static EntangledTypeProxyDescriptor ConstructLocalProxy<T>() where T : class, IEntangledObject
         {
             var typeInfo = typeof(T).GetTypeInfo();
-            if (!typeInfo.IsInterface)
-                throw new ArgumentException("The provided type must be an interface");
-
-            if (!typeInfo.IsPublic)
-                throw new ArgumentException("The provided type must be public");
+            if (!typeInfo.IsInterface || !typeInfo.IsPublic)
+                throw new ArgumentException("The provided type must be a public interface");
 
             var desc = new InterfaceDescriptor(typeof(T));
             var guid = typeInfo.GUID;
@@ -138,6 +135,7 @@ namespace Ace.Networking.Entanglement.Reflection
                     continue;
 
                 var definedGetter = prop.GetGetMethod();
+
                 var field = type.DefineField($"_{prop.Name}", prop.PropertyType, FieldAttributes.Private);
                 propItem.Value.BackingField = field;
                 var getProp = type.DefineProperty(prop.Name, PropertyAttributes.None, prop.PropertyType, null);

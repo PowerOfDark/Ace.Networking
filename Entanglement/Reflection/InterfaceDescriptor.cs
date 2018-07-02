@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using Ace.Networking.Entanglement.Attributes;
 using Ace.Networking.Entanglement.Packets;
 
 namespace Ace.Networking.Entanglement.Reflection
@@ -28,7 +29,7 @@ namespace Ace.Networking.Entanglement.Reflection
 
         public bool Equals(PropertyDescriptor x, PropertyDescriptor y)
         {
-            return x?.Property == y?.Property;
+            return Equals(x?.Property, y?.Property);
         }
 
         public int GetHashCode(PropertyDescriptor obj)
@@ -67,6 +68,10 @@ namespace Ace.Networking.Entanglement.Reflection
 
         private void Construct(Type t, bool onlyVirtualProperties = false)
         {
+            var info = t.GetTypeInfo();
+            if (!info.IsInterface || !info.IsPublic)
+                throw new ArgumentException("The provided type must be a public interface");
+
             FillProperties(t, onlyVirtualProperties);
             FillMethods(t);
         }
@@ -82,7 +87,11 @@ namespace Ace.Networking.Entanglement.Reflection
                 {
                     var current = q.Dequeue();
                     foreach (var p in current.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                    {
+                        if (p.GetCustomAttribute<IgnoredAttribute>() != null) continue;
                         _properties[p.Name] = new PropertyDescriptor {Property = p};
+                    }
+
                     foreach (var i in t.GetInterfaces())
                     {
                         if (seen.Contains(i)) continue;
@@ -98,6 +107,7 @@ namespace Ace.Networking.Entanglement.Reflection
 
             foreach (var p in properties)
             {
+                if (p.GetCustomAttribute<IgnoredAttribute>() != null) continue;
                 if (onlyVirtual)
                     try
                     {
@@ -126,7 +136,7 @@ namespace Ace.Networking.Entanglement.Reflection
 
             void fillMethod(MethodInfo m)
             {
-                if (m.IsGenericMethod || m.IsSpecialName) return;
+                if (m.IsGenericMethod || m.IsSpecialName || m.GetCustomAttribute<IgnoredAttribute>() != null) return;
                 var realRet = UnwrapTask(m.ReturnType);
                 if (realRet == null)
                 {

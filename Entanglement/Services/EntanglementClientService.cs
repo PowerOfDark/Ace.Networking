@@ -59,6 +59,8 @@ namespace Ace.Networking.Entanglement.Services
             instance = EntanglementLocalProxyProvider.Get<T>(_connection, result.Eid.Value);
             LocalInstances.TryAdd(result.Eid.Value, instance);
 
+            var test = await _connection.SendRequest<UpdateRequest, UpdateProperties>(new UpdateRequest() {Eid = result.Eid.Value});
+
             return (T) (object) instance;
         }
 

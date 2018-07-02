@@ -275,7 +275,7 @@ namespace Ace.Networking
         ///     This event should be used in a receive-only fashion.
         /// </summary>
         public event GlobalPayloadHandler PayloadReceived;
-
+  
         public event PayloadHandler PayloadSent;
         public event RawDataHandler RawDataReceived;
 

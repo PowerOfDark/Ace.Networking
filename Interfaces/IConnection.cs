@@ -1,4 +1,6 @@
 ﻿using System;
+using Ace.Networking.Handlers;
+using Ace.Networking.MicroProtocol.Headers;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.Services;
 
@@ -14,5 +16,8 @@ namespace Ace.Networking.Interfaces
         DateTime LastReceived { get; }
 
         void Initialize();
+
+        event PayloadHandler PayloadSent;
+        event RawDataHeader.RawDataHandler RawDataReceived;
     }
 }
