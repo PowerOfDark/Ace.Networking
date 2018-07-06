@@ -20,8 +20,8 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
         public EntangledHostedObjectBase(Guid eid, InterfaceDescriptor i)
         {
-            Eid = eid;
-            Descriptor = i;
+            _Eid = eid;
+            _Descriptor = i;
             Context = new EntanglementProviderContext();
             PropertyChanged += EntangledHostedObjectBase_PropertyChanged;
         }
@@ -30,7 +30,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
         private void EntangledHostedObjectBase_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (Descriptor.Properties.TryGetValue(e.PropertyName, out var prop))
+            if (_Descriptor.Properties.TryGetValue(e.PropertyName, out var prop))
             {
                 lock (_sync)
                 {
@@ -43,10 +43,10 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
         protected UpdateProperties GetAllProperties(IConnection con)
         {
-            var packet = new UpdateProperties {Updates = new List<PropertyData>(), Eid = Eid};
+            var packet = new UpdateProperties {Updates = new List<PropertyData>(), Eid = _Eid};
             using (var ms = new MemoryStream())
             {
-                foreach (var prop in Descriptor.Properties)
+                foreach (var prop in _Descriptor.Properties)
                 {
                     ms.SetLength(0);
                     con.Serializer.Serialize(prop.Value.Property.GetValue(this), ms);
@@ -69,7 +69,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             {
                 if (_pendingUpdates.Count == 0 || Context.All.Clients.Count == 0) return;
                 serializer = Context.All.Clients.First().Serializer;
-                packet = new UpdateProperties {Updates = new List<PropertyData>(_pendingUpdates.Count), Eid = Eid};
+                packet = new UpdateProperties {Updates = new List<PropertyData>(_pendingUpdates.Count), Eid = _Eid};
                 using (var ms = new MemoryStream())
                 {
                     foreach (var prop in _pendingUpdates)
@@ -96,7 +96,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             var cmd = (ExecuteMethod) req.Request;
 
             //find the best overload
-            var overload = Descriptor.FindOverload(cmd);
+            var overload = _Descriptor.FindOverload(cmd);
             lock (Context)
             {
                 if (!Context.All.ContainsClient(req.Connection))
@@ -187,7 +187,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
         {
             request.SendResponse(Context.All.ContainsClient(request.Connection)
                 ? GetAllProperties(request.Connection)
-                : new UpdateProperties() {Eid = this.Eid, Updates = null});
+                : new UpdateProperties() {Eid = _Eid, Updates = null});
         }
 
         public void AddClient(IConnection client)

@@ -17,8 +17,8 @@ namespace Ace.Networking.Entanglement.ProxyImpl
         public EntangledLocalObjectBase(IConnection host, Guid eid, InterfaceDescriptor desc)
         {
             Host = host;
-            Eid = eid;
-            Descriptor = desc;
+            _Eid = eid;
+            _Descriptor = desc;
         }
 
         public IConnection Host { get; internal set; }
@@ -27,7 +27,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
         {
             var exe = new ExecuteMethod
             {
-                Eid = Eid,
+                Eid = _Eid,
                 Arguments = arg?.Select(t =>
                 {
                     using (var ms = new MemoryStream())
@@ -73,7 +73,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             lock (_sync)
             {
                 foreach (var update in updates.Updates)
-                    if (Descriptor.Properties.TryGetValue(update.PropertyName, out var prop))
+                    if (_Descriptor.Properties.TryGetValue(update.PropertyName, out var prop))
                         using (var ms = new MemoryStream(update.SerializedData))
                         {
                             prop.BackingField.SetValue(this,

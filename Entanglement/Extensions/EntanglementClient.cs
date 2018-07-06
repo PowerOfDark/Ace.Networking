@@ -9,7 +9,7 @@ namespace Ace.Networking.Entanglement.Extensions
     public static class EntanglementClient
     {
         public static Task<T> Entangle<T>(this IConnection connection, Guid? eid = null)
-            where T : class, IEntangledObject
+            where T : class/*, IEntangledObject*/
         {
             var service = connection.Services.Get<IEntanglementClientService>();
             if (service == null)

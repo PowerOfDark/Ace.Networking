@@ -73,7 +73,7 @@ namespace Ace.Networking.Entanglement.Services
 
 
         public IEntanglementHostService Register<TBase, T>(EntanglementAccess access)
-            where TBase : class, IEntangledObject
+            where TBase : class/*, IEntangledObject*/
             where T : EntangledHostedObjectBase, TBase
         {
             var guid = typeof(TBase).GetTypeInfo().GUID;

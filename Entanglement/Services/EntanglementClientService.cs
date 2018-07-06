@@ -38,7 +38,7 @@ namespace Ace.Networking.Entanglement.Services
             _connection = null;
         }
 
-        public async Task<T> Entangle<T>(Guid? eid = null) where T : class, IEntangledObject
+        public async Task<T> Entangle<T>(Guid? eid = null) where T : class/*, IEntangledObject*/
         {
             var typeInfo = typeof(T).GetTypeInfo();
             if (!typeInfo.IsInterface || !typeInfo.IsPublic)
@@ -64,7 +64,7 @@ namespace Ace.Networking.Entanglement.Services
             return (T) (object) instance;
         }
 
-        protected EntangledLocalObjectBase GetExistingInstance<T>(Guid? eid = null) where T : class, IEntangledObject
+        protected EntangledLocalObjectBase GetExistingInstance<T>(Guid? eid = null) where T : class/*, IEntangledObject*/
         {
             if (eid.HasValue)
                 if (LocalInstances.TryGetValue(eid.Value, out var obj))

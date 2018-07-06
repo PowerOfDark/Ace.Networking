@@ -8,8 +8,8 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 {
     public abstract class EntangledObjectBase : IEntangledObject
     {
-        public Guid Eid { get; set; }
-        public InterfaceDescriptor Descriptor { get; set; }
+        public Guid _Eid { get; set; }
+        public InterfaceDescriptor _Descriptor { get; set; }
 
 
         public event PropertyChangedEventHandler PropertyChanged;

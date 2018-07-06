@@ -39,7 +39,7 @@ namespace Ace.Networking.Entanglement.Reflection
             }
         }
 
-        public static EntangledLocalObjectBase Get<T>(IConnection host, Guid eid) where T : class, IEntangledObject
+        public static EntangledLocalObjectBase Get<T>(IConnection host, Guid eid) where T : class/*, IEntangledObject*/
         {
             EntangledTypeProxyDescriptor desc;
             var guid = typeof(T).GetTypeInfo().GUID;
@@ -55,7 +55,7 @@ namespace Ace.Networking.Entanglement.Reflection
             return obj;
         }
 
-        private static EntangledTypeProxyDescriptor ConstructLocalProxy<T>() where T : class, IEntangledObject
+        private static EntangledTypeProxyDescriptor ConstructLocalProxy<T>() where T : class/*, IEntangledObject*/
         {
             var typeInfo = typeof(T).GetTypeInfo();
             if (!typeInfo.IsInterface || !typeInfo.IsPublic)
