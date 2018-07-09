@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
-using Ace.Networking.Entanglement.Attributes;
 using Ace.Networking.Entanglement.Packets;
 
 namespace Ace.Networking.Entanglement.Reflection

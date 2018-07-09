@@ -4,9 +4,9 @@ using Ace.Networking.Entanglement.Services;
 using Ace.Networking.Entanglement.Structures;
 using Ace.Networking.Interfaces;
 
-namespace Ace.Networking.Entanglement.Extensions
+namespace Ace.Networking.Entanglement
 {
-    public static class EntanglementClient
+    public static class EntanglementClientExtensions
     {
         public static Task<T> Entangle<T>(this IConnection connection, Guid? eid = null)
             where T : class/*, IEntangledObject*/

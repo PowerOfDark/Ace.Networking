@@ -1,4 +1,4 @@
-﻿namespace Ace.Networking.Entanglement.Services
+﻿namespace Ace.Networking.Entanglement
 {
     public enum EntanglementAccess
     {

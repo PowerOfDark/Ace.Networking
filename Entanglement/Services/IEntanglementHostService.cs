@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using Ace.Networking.Entanglement.ProxyImpl;
 using Ace.Networking.Entanglement.Structures;
 using Ace.Networking.Interfaces;
@@ -10,6 +11,8 @@ namespace Ace.Networking.Entanglement.Services
     {
         IEntanglementHostService Register<TBase, T>(EntanglementAccess access) where TBase : class/*, IEntangledObject*/
             where T : EntangledHostedObjectBase, TBase;
+
+        IEntanglementHostService RegisterAll(string namespaceBase = null, Assembly assembly = null);
 
         Guid? GetInstance(Guid interfaceId, IConnection scope = null);
 

@@ -5,11 +5,12 @@ using System.Reflection;
 using Ace.Networking.Entanglement.Packets;
 using Ace.Networking.Entanglement.ProxyImpl;
 using Ace.Networking.Entanglement.Reflection;
+using Ace.Networking.Entanglement.Services;
 using Ace.Networking.Entanglement.Structures;
 using Ace.Networking.Handlers;
 using Ace.Networking.Interfaces;
 
-namespace Ace.Networking.Entanglement.Services
+namespace Ace.Networking.Entanglement
 {
     public class EntanglementHostService : IEntanglementHostService
     {
@@ -72,20 +73,43 @@ namespace Ace.Networking.Entanglement.Services
         }
 
 
-        public IEntanglementHostService Register<TBase, T>(EntanglementAccess access)
-            where TBase : class/*, IEntangledObject*/
-            where T : EntangledHostedObjectBase, TBase
+        private void Register(Type baseType, Type type, EntanglementAccess access)
         {
-            var guid = typeof(TBase).GetTypeInfo().GUID;
+            var guid = baseType.GetTypeInfo().GUID;
             if (!Interfaces.TryAdd(guid,
                 new InterfaceEntry
                 {
                     Access = access,
-                    Type = typeof(T),
+                    Type = type,
                     InterfaceId = guid,
-                    InterfaceDescriptor = InterfaceDescriptor.Get(typeof(TBase))
+                    InterfaceDescriptor = InterfaceDescriptor.Get(baseType)
                 }))
                 Interfaces[guid].Access = access;
+        }
+
+        public IEntanglementHostService Register<TBase, T>(EntanglementAccess access)
+            where TBase : class/*, IEntangledObject*/
+            where T : EntangledHostedObjectBase, TBase
+        {
+            Register(typeof(TBase), typeof(T), access);
+            return this;
+        }
+
+        public IEntanglementHostService RegisterAll(string namespaceBase = null, Assembly assembly = null)
+        {
+            if (assembly == null)
+                assembly = Assembly.GetEntryAssembly();
+            var dot = (namespaceBase??string.Empty) + ".";
+            foreach (var type in assembly.GetTypes())
+            {
+                var attr = type.GetTypeInfo().GetCustomAttribute<EntanglementAttribute>();
+                if (attr == null) continue;
+                if (namespaceBase == null || type.Namespace == namespaceBase || type.Namespace.StartsWith(dot))
+                {
+                    Register(attr.Interface, type, attr.Access);
+                }
+            }
+
             return this;
         }
 

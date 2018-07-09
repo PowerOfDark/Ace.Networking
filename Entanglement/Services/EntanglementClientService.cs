@@ -5,10 +5,11 @@ using System.Threading.Tasks;
 using Ace.Networking.Entanglement.Packets;
 using Ace.Networking.Entanglement.ProxyImpl;
 using Ace.Networking.Entanglement.Reflection;
+using Ace.Networking.Entanglement.Services;
 using Ace.Networking.Entanglement.Structures;
 using Ace.Networking.Interfaces;
 
-namespace Ace.Networking.Entanglement.Services
+namespace Ace.Networking.Entanglement
 {
     public class EntanglementClientService : IEntanglementClientService
     {
