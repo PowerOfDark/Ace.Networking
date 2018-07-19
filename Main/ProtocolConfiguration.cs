@@ -32,6 +32,8 @@ namespace Ace.Networking
             var serializer = new MsgPackSerializer();
             PayloadEncoder = new MicroEncoder(serializer.Clone());
             PayloadDecoder = new MicroDecoder(serializer.Clone());
+            CustomIncomingMessageQueue = GlobalIncomingMessageQueue.Instance;
+            CustomOutcomingMessageQueue = GlobalOutcomingMessageQueue.Instance;
             Initialize();
         }
 

@@ -7,6 +7,7 @@ using Ace.Networking.Entanglement.Packets;
 using Ace.Networking.Entanglement.Reflection;
 using Ace.Networking.Entanglement.Structures;
 using Ace.Networking.Interfaces;
+using Ace.Networking.Memory;
 
 namespace Ace.Networking.Entanglement.ProxyImpl
 {
@@ -30,10 +31,9 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                 Eid = _Eid,
                 Arguments = arg?.Select(t =>
                 {
-                    using (var ms = new MemoryStream())
+                    using (var ms = MemoryManager.Instance.GetStream())
                     {
                         Host.Serializer.Serialize(t, ms);
-
                         var p = new MethodParameter
                         {
                             FullName = t.GetType().FullName,

@@ -223,7 +223,6 @@ namespace Ace.Networking.Entanglement
 
         protected bool OnRequestExecuteMethodResult(IRequestWrapper wrapper)
         {
-            Console.WriteLine("On request execute method result");
             var cmd = (ExecuteMethod) wrapper.Request;
             if (Objects.TryGetValue(cmd.Eid, out var obj)) obj.Execute(wrapper);
             return true;

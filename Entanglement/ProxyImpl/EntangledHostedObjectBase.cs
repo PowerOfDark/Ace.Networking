@@ -9,6 +9,7 @@ using Ace.Networking.Entanglement.Packets;
 using Ace.Networking.Entanglement.Reflection;
 using Ace.Networking.Entanglement.Structures;
 using Ace.Networking.Interfaces;
+using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Interfaces;
 
 namespace Ace.Networking.Entanglement.ProxyImpl
@@ -22,11 +23,11 @@ namespace Ace.Networking.Entanglement.ProxyImpl
         {
             _Eid = eid;
             _Descriptor = i;
-            Context = new EntanglementProviderContext();
+            _Context = new EntanglementProviderContext();
             PropertyChanged += EntangledHostedObjectBase_PropertyChanged;
         }
 
-        protected EntanglementProviderContext Context { get; }
+        protected EntanglementProviderContext _Context { get; }
 
         private void EntangledHostedObjectBase_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
@@ -44,7 +45,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
         protected UpdateProperties GetAllProperties(IConnection con)
         {
             var packet = new UpdateProperties {Updates = new List<PropertyData>(), Eid = _Eid};
-            using (var ms = new MemoryStream())
+            using (var ms = MemoryManager.Instance.GetStream())
             {
                 foreach (var prop in _Descriptor.Properties)
                 {
@@ -67,10 +68,10 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             IPayloadSerializer serializer;
             lock (_sync)
             {
-                if (_pendingUpdates.Count == 0 || Context.All.Clients.Count == 0) return;
-                serializer = Context.All.Clients.First().Serializer;
+                if (_pendingUpdates.Count == 0 || _Context.All.Clients.Count == 0) return;
+                serializer = _Context.All.Clients.First().Serializer;
                 packet = new UpdateProperties {Updates = new List<PropertyData>(_pendingUpdates.Count), Eid = _Eid};
-                using (var ms = new MemoryStream())
+                using (var ms = MemoryManager.Instance.GetStream())
                 {
                     foreach (var prop in _pendingUpdates)
                     {
@@ -87,7 +88,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                 _pendingUpdates.Clear();
             }
 
-            Context.All.Send(packet);
+            _Context.All.Send(packet);
         }
 
 
@@ -97,9 +98,9 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
             //find the best overload
             var overload = _Descriptor.FindOverload(cmd);
-            lock (Context)
+            lock (_Context)
             {
-                if (!Context.All.ContainsClient(req.Connection))
+                if (!_Context.All.ContainsClient(req.Connection))
                 {
                     req.SendResponse(new ExecuteMethodResult
                     {
@@ -108,7 +109,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                     return;
                 }
 
-                Context.Sender = req.Connection;
+                _Context.Sender = req.Connection;
                 RemoteExceptionAdapter exception = null;
                 Task task = null;
                 try
@@ -185,14 +186,14 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
         public void SendState(IRequestWrapper request)
         {
-            request.SendResponse(Context.All.ContainsClient(request.Connection)
+            request.SendResponse(_Context.All.ContainsClient(request.Connection)
                 ? GetAllProperties(request.Connection)
                 : new UpdateProperties() {Eid = _Eid, Updates = null});
         }
 
         public void AddClient(IConnection client)
         {
-            Context?.All.AddClient(client);
+            _Context?.All.AddClient(client);
         }
     }
 }

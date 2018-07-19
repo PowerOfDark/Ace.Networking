@@ -2,6 +2,7 @@
 using System.IO;
 using System.Runtime.CompilerServices;
 using Ace.Networking.Interfaces;
+using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Enums;
 using Ace.Networking.MicroProtocol.Headers;
 using Ace.Networking.MicroProtocol.Interfaces;
@@ -19,7 +20,6 @@ namespace Ace.Networking.MicroProtocol
 
         private readonly IBufferSlice _bufferSlice;
 
-        private readonly MemoryStream _internalStream = new MemoryStream();
         private Stream _bodyStream;
         private int _bytesEnqueued;
         private int _bytesLeftToSend;
@@ -165,7 +165,7 @@ namespace Ace.Networking.MicroProtocol
             _bytesTransferred = 0;
             _bytesLeftToSend = 0;
 
-            if (!ReferenceEquals(_bodyStream, _internalStream) && _disposeBodyStream)
+            if (_disposeBodyStream)
             {
                 //bodyStream is null for channels that connected
                 //but never sent a message.
@@ -173,12 +173,8 @@ namespace Ace.Networking.MicroProtocol
                 _bodyStream?.Dispose();
                 _bodyStream = null;
             }
-            else
-            {
-                _internalStream.SetLength(0);
-            }
 
-            _bodyStream = _internalStream;
+
 
             _headerIsSent = false;
             _headerSize = 0;
@@ -211,7 +207,8 @@ namespace Ace.Networking.MicroProtocol
                 }
                 else
                 {
-                    _bodyStream = _internalStream;
+                    _bodyStream = MemoryManager.Instance.GetStream();
+                    _disposeBodyStream = true;
                     Serializer.Serialize(_message, _bodyStream, out var contentType);
                     if (contentType == null) contentType = Serializer.CreateContentType(_message.GetType());
                     if (contentType.Length > 2048)

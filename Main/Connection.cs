@@ -31,7 +31,7 @@ namespace Ace.Networking
 
         public delegate bool PayloadFilter(object payload, Type type);
 
-        public const int BufferSize = 16384;
+        public const int BufferSize = 8192;
 
         internal static long _lastId = 1;
         internal static int _lastRawDataBufferId = 1;
@@ -276,7 +276,7 @@ namespace Ace.Networking
         /// </summary>
         public event GlobalPayloadHandler PayloadReceived;
   
-        public event PayloadHandler PayloadSent;
+        public event GlobalPayloadHandler PayloadSent;
         public event RawDataHandler RawDataReceived;
 
         public override int GetHashCode()
@@ -566,7 +566,7 @@ namespace Ace.Networking
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SendSync(IPreparedPacket msg)
+        private void SendSync(IPreparedPacket msg, TaskCompletionSource<object> sendCompletionSource)
         {
             if (Socket == null || !Connected) throw new SocketException((int) SocketError.NotInitialized);
 
@@ -596,7 +596,7 @@ namespace Ace.Networking
             if (!err)
             {
                 //_sendLock.Release();
-                _sendCompletionSource?.TrySetResult(_payloadPending);
+                sendCompletionSource?.TrySetResult(_payloadPending);
                 PayloadSent?.Invoke(this, _payloadPending, _payloadPendingType);
             }
         }
@@ -609,8 +609,7 @@ namespace Ace.Networking
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void PushSendSync(TaskCompletionSource<object> tcs)
         {
-            _sendCompletionSource = tcs;
-            SendSync(tcs.Task.AsyncState as IPreparedPacket);
+            SendSync(tcs.Task.AsyncState as IPreparedPacket,  tcs);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -620,7 +619,7 @@ namespace Ace.Networking
             var tcs = new TaskCompletionSource<object>(packet);
             if (UseCustomOutcomingMessageQueue)
             {
-                CustomOutcomingMessageQueue.Enqueue(new SendMessageQueueItem(this, tcs), (int) Identifier);
+                CustomOutcomingMessageQueue.Enqueue(new SendMessageQueueItem(this, tcs), GetHashCode());
             }
             else
             {

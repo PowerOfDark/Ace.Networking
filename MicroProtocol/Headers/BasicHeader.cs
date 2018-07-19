@@ -11,10 +11,10 @@ namespace Ace.Networking.MicroProtocol.Headers
             PacketFlag = PacketFlag.None;
         }
 
-        public int Position { get; set; }
+        public int Position;// { get; set; }
 
-        public PacketType PacketType { get; set; }
-        public PacketFlag PacketFlag { get; set; }
+        public PacketType PacketType;// { get; set; }
+        public PacketFlag PacketFlag;// { get; set; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void Serialize(byte[] target, int offset = 0)

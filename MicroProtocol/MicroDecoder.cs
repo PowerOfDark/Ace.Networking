@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Runtime.CompilerServices;
+using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Enums;
 using Ace.Networking.MicroProtocol.Headers;
 using Ace.Networking.MicroProtocol.Interfaces;
@@ -16,7 +17,7 @@ namespace Ace.Networking.MicroProtocol
         /// </summary>
         public const byte Version = 2;
 
-        private readonly MemoryStream _contentStream = new MemoryStream();
+        private MemoryStream _contentStream;// = new MemoryStream();
         private readonly byte[] _header = new byte[short.MaxValue];
 
         private int _bytesLeftForCurrentState;
@@ -52,7 +53,7 @@ namespace Ace.Networking.MicroProtocol
         {
             _bytesLeftForCurrentState = sizeof(short);
             _bytesLeftInSocketBuffer = 0;
-            _contentStream.SetLength(0);
+            _contentStream?.Dispose();
             _headerOffset = 0;
             _socketBufferOffset = 0;
             _stateMethod = ReadHeaderLength;
@@ -150,11 +151,16 @@ namespace Ace.Networking.MicroProtocol
             _bytesLeftForCurrentState = (_headerObject as ContentHeader)?.ContentLength ?? -1;
             if (_headerObject.PacketType == PacketType.RawData)
                 _bytesLeftForCurrentState = (_headerObject as RawDataHeader)?.ContentLength ?? -1;
+
+            
+
             if (_headerObject.PacketFlag.HasFlag(PacketFlag.NoContent) || _bytesLeftForCurrentState == 0)
                 _bytesLeftForCurrentState = -1;
+            else
+            {
+                _contentStream = MemoryManager.Instance.GetStream(string.Empty, _bytesLeftForCurrentState);
+            }
             _headerOffset = 0;
-            _contentStream.Position = 0;
-            _contentStream.SetLength(0);
             return true;
         }
 
@@ -175,17 +181,18 @@ namespace Ace.Networking.MicroProtocol
             _bytesLeftForCurrentState = sizeof(ushort);
             _headerOffset = 0;
             _stateMethod = ReadHeaderLength;
-            _contentStream.Position = 0;
+            _contentStream?.Seek(0, SeekOrigin.Begin);
 
+            bool isProcessed = false;
             if (_headerObject.PacketType == PacketType.RawData)
             {
                 if (!(_headerObject is RawDataHeader rawData)) return false;
                 RawDataReceived(rawData.RawDataBufferId, rawData.RawDataSeq, _contentStream);
-                return true;
+                isProcessed = true;
             }
 
 
-            if (_headerObject is ContentHeader content)
+            if (!isProcessed && _headerObject is ContentHeader content)
             {
                 var contentType = content.ContentType;
                 var packet = new DefaultContentPacket(content, null);
@@ -194,6 +201,12 @@ namespace Ace.Networking.MicroProtocol
                 packet.Type = resolvedType;
 
                 if (packet.Payload != null) PacketReceived(packet.Header, packet.Payload, packet.Type);
+                isProcessed = true;
+            }
+
+            if (isProcessed)
+            {
+                _contentStream?.Dispose();
                 return true;
             }
 

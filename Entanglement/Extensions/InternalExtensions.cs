@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Interfaces;
 
 namespace Ace.Networking.Entanglement.Extensions
@@ -18,7 +19,7 @@ namespace Ace.Networking.Entanglement.Extensions
 
         public static byte[] Serialize(object obj, IPayloadSerializer serializer)
         {
-            using (var ms = new MemoryStream())
+            using (var ms = MemoryManager.Instance.GetStream())
             {
                 serializer.Serialize(obj, ms);
                 return ms.ToArray();

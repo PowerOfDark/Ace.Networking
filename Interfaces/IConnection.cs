@@ -17,7 +17,7 @@ namespace Ace.Networking.Interfaces
 
         void Initialize();
 
-        event PayloadHandler PayloadSent;
+        event GlobalPayloadHandler PayloadSent;
         event RawDataHeader.RawDataHandler RawDataReceived;
     }
 }

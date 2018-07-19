@@ -19,9 +19,9 @@ namespace Ace.Networking.Threading
 
         [DataMember] public int MonitorTickrate = 10;
 
-        [DataMember] public bool PreservePartitioning;
+        [DataMember] public bool PreservePartitioning = true;
 
-        [DataMember] public int QueueCapacity = 1000;
+        [DataMember] public int QueueCapacity = 10000;
 
         [DataMember] public int StepdownBarrierTicks = 200;
 

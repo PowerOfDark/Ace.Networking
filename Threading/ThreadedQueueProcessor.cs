@@ -340,7 +340,7 @@ namespace Ace.Networking.Threading
                 }
                 else
                 {
-                    while (!handle.WaitOne(5))
+                    while (!handle.WaitOne(1))
                         if (_pending <= barrier)
                         {
                             if (!cState)
@@ -393,7 +393,7 @@ namespace Ace.Networking.Threading
                 }
                 else
                 {
-                    handle.WaitOne(5);
+                    handle.WaitOne();
                 }
 
             //Console.WriteLine($"Thread {Thread.CurrentThread.ManagedThreadId} killed");

@@ -15,6 +15,7 @@ namespace Ace.Networking.Serializers
     public class MsgPackSerializer : IPayloadSerializer
     {
         private static readonly Dictionary<string, Type> Types = new Dictionary<string, Type>();
+        private static readonly Dictionary<Type, byte[]> ContentTypeCache = new Dictionary<Type, byte[]>();
 
         private static readonly byte[] ContentType = {0x4F, 0x47};
 
@@ -85,11 +86,17 @@ namespace Ace.Networking.Serializers
 
         public byte[] CreateContentType(Type type)
         {
+            if (ContentTypeCache.TryGetValue(type, out var b))
+                return b;
             var typeS = type.FullName;
-            var b = new byte[2 + Encoding.UTF8.GetByteCount(typeS)];
+            b = new byte[2 + Encoding.UTF8.GetByteCount(typeS)];
             b[0] = ContentType[0];
             b[1] = ContentType[1];
             Encoding.UTF8.GetBytes(typeS, 0, typeS.Length, b, 2);
+            lock (ContentTypeCache)
+            {
+                ContentTypeCache[type] = b;
+            }
             return b;
         }
 
@@ -106,7 +113,6 @@ namespace Ace.Networking.Serializers
                     });
                 foreach (var type in types)
                     Types[type.FullName] = type;
-                Types["System.Object"] = typeof(object);
             }
         }
     }
