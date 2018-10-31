@@ -236,10 +236,10 @@ namespace Ace.Networking
             Connections.TryRemove(connection.Identifier, out _);
         }
 
-        private void Con_DispatchPayload(Connection connection, object payload, Type type,
+        private bool Con_DispatchPayload(Connection connection, object payload, Type type,
             Action<object> responseSender, int? requestId)
         {
-            ProcessPayloadHandlers(connection, payload, type, responseSender, requestId);
+            bool ret = ProcessPayloadHandlers(connection, payload, type, responseSender, requestId);
             try
             {
                 PayloadReceived?.Invoke(connection, payload, type);
@@ -248,6 +248,7 @@ namespace Ace.Networking
             {
                 // ignored
             }
+            return ret;
 
             //TODO: Inconsistencies
         }

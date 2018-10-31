@@ -8,6 +8,7 @@ using Ace.Networking.MicroProtocol.Headers;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.PacketTypes;
 using Ace.Networking.MicroProtocol.Structures;
+using Ace.Networking.Serializers;
 
 namespace Ace.Networking.MicroProtocol
 {
@@ -195,14 +196,16 @@ namespace Ace.Networking.MicroProtocol
             {
                 if (_message is Stream)
                 {
+                    throw new NotSupportedException();
                     _bodyStream = (Stream) _message;
-                    content.ContentType = Serializer.CreateContentType(typeof(Stream));
+                    content.ContentType = PayloadSerializerBase.NullSerializer;
                 }
                 else if (_message is byte[] buf)
                 {
+                    throw new NotSupportedException();
                     _bodyStream = new MemoryStream(buf);
                     _bodyStream.SetLength(buf.Length);
-                    content.ContentType = Serializer.CreateContentType(typeof(byte[]));
+                    content.ContentType = PayloadSerializerBase.NullSerializer;
                     _disposeBodyStream = true;
                 }
                 else
@@ -210,7 +213,7 @@ namespace Ace.Networking.MicroProtocol
                     _bodyStream = MemoryManager.Instance.GetStream();
                     _disposeBodyStream = true;
                     Serializer.Serialize(_message, _bodyStream, out var contentType);
-                    if (contentType == null) contentType = Serializer.CreateContentType(_message.GetType());
+                    if (contentType == null) throw new InvalidOperationException($"Missing content type. Serializer: {Serializer.GetType().FullName}");
                     if (contentType.Length > 2048)
                         throw new InvalidOperationException(
                             "The content type may not be larger than 2048 bytes. Type: " +
@@ -220,7 +223,8 @@ namespace Ace.Networking.MicroProtocol
                 }
 
                 contentLength = content.ContentLength = checked((int) (_bodyStream.Length - _bodyStream.Position));
-                if (content.ContentLength == 0) content.PacketFlag |= PacketFlag.NoContent;
+                if (content.ContentLength == 0)
+                    content.PacketFlag |= PacketFlag.NoContent;
             }
             else if (_header is RawDataHeader raw)
             {

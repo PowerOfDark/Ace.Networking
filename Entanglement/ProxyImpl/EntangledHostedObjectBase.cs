@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Ace.Networking.Entanglement.Extensions;
 using Ace.Networking.Entanglement.Packets;
@@ -11,12 +12,13 @@ using Ace.Networking.Entanglement.Structures;
 using Ace.Networking.Interfaces;
 using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Interfaces;
+using Microsoft.CSharp.RuntimeBinder;
 
 namespace Ace.Networking.Entanglement.ProxyImpl
 {
     public abstract class EntangledHostedObjectBase : EntangledObjectBase
     {
-        private readonly HashSet<PropertyDescriptor> _pendingUpdates = new HashSet<PropertyDescriptor>();
+        private readonly HashSet<Reflection.PropertyDescriptor> _pendingUpdates = new HashSet<Reflection.PropertyDescriptor>();
         protected object _sync = new object();
 
         public EntangledHostedObjectBase(Guid eid, InterfaceDescriptor i)
@@ -98,6 +100,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
             //find the best overload
             var overload = _Descriptor.FindOverload(cmd);
+            
             lock (_Context)
             {
                 if (!_Context.All.ContainsClient(req.Connection))

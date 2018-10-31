@@ -1,18 +1,23 @@
-﻿using System.Reflection;
+﻿using System;
+using System.IO;
+using System.Reflection;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using Ace.Networking.MicroProtocol;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.SSL;
-using Ace.Networking.ProtoBuf;
 using Ace.Networking.Serializers;
+using Ace.Networking.Serializers.Protobuf;
+using Ace.Networking.Serializers.TypeResolvers;
 using Ace.Networking.Threading;
 
 namespace Ace.Networking
 {
     public class ProtocolConfiguration
     {
-        public static ProtocolConfiguration Instance = new ProtocolConfiguration();
+        public static readonly Type[] Primitives = { typeof(object), typeof(Stream), typeof(byte[]) };
+        public static Lazy<ProtocolConfiguration> Instance = new Lazy<ProtocolConfiguration>(() => new ProtocolConfiguration());
+
 
         protected volatile bool IsInitialized;
 
@@ -29,7 +34,9 @@ namespace Ace.Networking
 
         public ProtocolConfiguration()
         {
-            var serializer = new MsgPackSerializer();
+            TypeResolver = new GuidTypeResolver();
+            var serializer = new ProtobufSerializer(TypeResolver);
+            
             PayloadEncoder = new MicroEncoder(serializer.Clone());
             PayloadDecoder = new MicroDecoder(serializer.Clone());
             CustomIncomingMessageQueue = GlobalIncomingMessageQueue.Instance;
@@ -37,6 +44,7 @@ namespace Ace.Networking
             Initialize();
         }
 
+        public ITypeResolver TypeResolver { get; protected set; }
         public IPayloadEncoder PayloadEncoder { get; protected set; }
         public IPayloadDecoder PayloadDecoder { get; protected set; }
 
@@ -52,13 +60,10 @@ namespace Ace.Networking
             IsInitialized = true;
 
 
-            PayloadEncoder.Serializer.RegisterAssembly(GetType().GetTypeInfo().Assembly);
-            PayloadEncoder.Serializer.RegisterAssembly(typeof(Connection).GetTypeInfo().Assembly);
-            if (PayloadEncoder.Serializer != PayloadDecoder.Serializer)
-            {
-                PayloadDecoder.Serializer.RegisterAssembly(GetType().GetTypeInfo().Assembly);
-                PayloadDecoder.Serializer.RegisterAssembly(typeof(Connection).GetTypeInfo().Assembly);
-            }
+            TypeResolver.RegisterAssembly(GetType().GetTypeInfo().Assembly);
+            TypeResolver.RegisterAssembly(typeof(Connection).GetTypeInfo().Assembly);
+            foreach (var primitive in Primitives)
+                TypeResolver.RegisterType(primitive);
         }
 
         public virtual ClientSslStreamFactory GetClientSslFactory(string targetCommonName = "",

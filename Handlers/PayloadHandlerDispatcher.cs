@@ -151,9 +151,10 @@ namespace Ace.Networking.Handlers
             return OffRequest(typeof(T));
         }
 
-        protected void ProcessPayloadHandlers(IConnection connection, object obj, Type type,
+        protected bool ProcessPayloadHandlers(IConnection connection, object obj, Type type,
             Action<object> responseSender = null, int? requestId = null)
         {
+            bool handled = false;
             if (TypeHandlers.TryGetValue(type, out var list))
                 lock (list)
                 {
@@ -162,7 +163,9 @@ namespace Ace.Networking.Handlers
                         foreach (var f in list)
                         {
                             var r = f.Invoke(connection, obj, type);
-                            if (r != null) responseSender?.Invoke(r);
+                            responseSender?.Invoke(r);
+                            handled |= r != null;
+                            
                         }
                     }
                     catch
@@ -178,15 +181,22 @@ namespace Ace.Networking.Handlers
                 if (RequestHandlers.TryGetValue(type, out var handler))
                     lock (handler)
                     {
+                        var wrapper = new RequestWrapper(connection, requestId.Value, obj);
                         foreach (var h in handler)
                             try
                             {
-                                if (h?.Invoke(new RequestWrapper(connection, requestId.Value, obj)) ?? false) break;
+                                if (h?.Invoke(wrapper) ?? false)
+                                {
+                                    handled = true;
+                                    break;
+                                }
                             }
                             catch
                             {
                             }
                     }
+
+            return handled;
         }
     }
 }

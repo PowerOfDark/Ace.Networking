@@ -47,9 +47,12 @@ namespace Ace.Networking
 
         public IConnection Build(TcpClient client)
         {
-            return new Connection(client, _config ?? new ProtocolConfiguration(),
-                _services?.Build() ?? ServicesManager<IConnection>.Empty, _sslFactory,
-                _data ?? new ConnectionData(), _dispatcher);
+            var cfg = _config ?? new ProtocolConfiguration();
+            var services = _services?.Build() ?? ServicesManager<IConnection>.Empty;
+            IConnectionData data = _data ?? new ConnectionData();
+            return new Connection(client, cfg,
+                services, _sslFactory,
+                data, _dispatcher);
         }
 
         public IConnectionBuilder UseDispatcher(Connection.InternalPayloadDispatchHandler dispatcher)

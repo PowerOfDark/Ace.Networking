@@ -3,9 +3,12 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 using System;
+using System.Buffers;
 using System.Diagnostics;
+using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using static System.Runtime.CompilerServices.Unsafe;
 
@@ -14,14 +17,19 @@ namespace Spreads.Buffers
     /// <summary>
     /// Provides unsafe read/write opertaions on a memory pointer.
     /// </summary>
+    [DebuggerTypeProxy(typeof(SpreadsBuffers_DirectBufferDebugView))]
     [DebuggerDisplay("Length={" + nameof(Length) + ("}"))]
     [StructLayout(LayoutKind.Sequential)]
     public readonly unsafe struct DirectBuffer
     {
-        public static DirectBuffer Invalid = new DirectBuffer((IntPtr)(-1), (byte*)IntPtr.Zero);
+        public static DirectBuffer Invalid = new DirectBuffer(0, (byte*)IntPtr.Zero);
 
-        private readonly IntPtr _length;
-        internal readonly byte* _data;
+        // NB this is used for Spreads.LMDB as MDB_val, where length is IntPtr. However, LMDB works normally only on x64
+        // if we even support x86 we will have to create a DTO with IntPtr length. But for x64 casting IntPtr to/from long
+        // is surprisingly expensive, e.g. Slice and ctor show up in profiler.
+
+        internal readonly long _length;
+        internal readonly byte* _pointer;
 
         /// <summary>
         /// Attach a view to an unmanaged buffer owned by external code
@@ -39,68 +47,100 @@ namespace Spreads.Buffers
             {
                 throw new ArgumentException("Memory size must be > 0");
             }
-            _length = (IntPtr)length;
-            _data = (byte*)data;
+            _length = length;
+            _pointer = (byte*)data;
         }
 
         /// <summary>
         /// Unsafe constructors performs no input checks.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public DirectBuffer(IntPtr length, byte* data)
+        public DirectBuffer(long length, byte* pointer)
         {
-            _data = data;
             _length = length;
+            _pointer = pointer;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public DirectBuffer(RetainedMemory<byte> retainedMemory)
+        {
+            _length = retainedMemory.Length;
+            _pointer = (byte*)retainedMemory.Pointer;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public DirectBuffer(Span<byte> span)
         {
-            _data = (byte*)AsPointer(ref MemoryMarshal.GetReference(span));
-            _length = (IntPtr)span.Length;
+            _length = span.Length;
+            _pointer = (byte*)AsPointer(ref span.GetPinnableReference());
         }
 
         public bool IsValid
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return _length != (IntPtr)(-1); }
+            get => _pointer != null;
         }
 
-        public ReadOnlySpan<byte> Span
+        // TODO review: empty could be a result from Slice and perfectly valid, so it is not the same as IsValid which checks pointer.
+        public bool IsEmpty
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return new ReadOnlySpan<byte>(_data, (int)_length); }
+            get => _length == 0;
+        }
+
+        public Span<byte> Span
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => new Span<byte>(_pointer, (int)_length);
         }
 
         /// <summary>
         /// Capacity of the underlying buffer
         /// </summary>
-        public long Length
+        public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return (long)_length; }
+            get => checked((int)_length);
         }
 
-        public IntPtr Data
+        public long LongLength
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return (IntPtr)_data; }
+            get => _length;
+        }
+
+        public byte* Data
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _pointer;
+        }
+
+        // for cases when unsafe is not allowed, e.g. async
+        public IntPtr IntPtr
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => (IntPtr)_pointer;
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public DirectBuffer Slice(long start)
+        {
+
+            return new DirectBuffer(_length - start, _pointer + start);
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public DirectBuffer Slice(long start, long length)
+        {
+            return new DirectBuffer(length, _pointer + start);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool HasCapacity(long offset, long length)
+        internal void Assert(long index, long length)
         {
-            return (ulong)offset + (ulong)length <= (ulong)_length;
-        }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        [Conditional("DEBUG")]
-        private void Assert(long index, long length)
-        {
-            if ((ulong)index + (ulong)length > (ulong)_length)
-            {
-                throw new ArgumentException("Not enough space");
-            }
         }
 
         /// <summary>
@@ -108,11 +148,11 @@ namespace Spreads.Buffers
         /// </summary>
         /// <param name="index">index in bytes from which to get.</param>
         /// <returns>the value at a given index.</returns>
+        [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public char ReadChar(long index)
         {
-            Assert(index, 2);
-            return ReadUnaligned<char>(_data + index);
+            return ReadUnaligned<char>(_pointer + index);
         }
 
         /// <summary>
@@ -123,8 +163,7 @@ namespace Spreads.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteChar(long index, char value)
         {
-            Assert(index, 2);
-            WriteUnaligned(_data + index, value);
+            WriteUnaligned(_pointer + index, value);
         }
 
         /// <summary>
@@ -135,8 +174,7 @@ namespace Spreads.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public sbyte ReadSByte(long index)
         {
-            Assert(index, 1);
-            return ReadUnaligned<sbyte>(_data + index);
+            return ReadUnaligned<sbyte>(_pointer + index);
         }
 
         /// <summary>
@@ -147,8 +185,7 @@ namespace Spreads.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteSByte(long index, sbyte value)
         {
-            Assert(index, 1);
-            WriteUnaligned(_data + index, value);
+            WriteUnaligned(_pointer + index, value);
         }
 
         /// <summary>
@@ -156,11 +193,11 @@ namespace Spreads.Buffers
         /// </summary>
         /// <param name="index"> index in bytes from which to get.</param>
         /// <returns>the value at a given index.</returns>
+        [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte ReadByte(long index)
         {
-            Assert(index, 1);
-            return ReadUnaligned<byte>(_data + index);
+            return ReadUnaligned<byte>(_pointer + index);
         }
 
         /// <summary>
@@ -171,23 +208,32 @@ namespace Spreads.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteByte(long index, byte value)
         {
-            Assert(index, 1);
-            WriteUnaligned(_data + index, value);
+            WriteUnaligned(_pointer + index, value);
         }
 
+        [Pure]
         public byte this[long index]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                Assert(index, 1);
-                return ReadUnaligned<byte>(_data + index);
+                return *(_pointer + index);
             }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                Assert(index, 1);
-                WriteUnaligned(_data + index, value);
+
+                *(_pointer + index) = value;
+            }
+        }
+
+        [Pure]
+        public ref byte this[int index]
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return ref AsRef<byte>(*(_pointer + index));
             }
         }
 
@@ -197,10 +243,10 @@ namespace Spreads.Buffers
         /// <param name="index"> index in bytes from which to get.</param>
         /// <returns>the value at a given index.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public short ReadInt16(long index)
         {
-            Assert(index, 2);
-            return ReadUnaligned<short>(_data + index);
+            return ReadUnaligned<short>(_pointer + index);
         }
 
         /// <summary>
@@ -211,8 +257,7 @@ namespace Spreads.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteInt16(long index, short value)
         {
-            Assert(index, 2);
-            WriteUnaligned(_data + index, value);
+            WriteUnaligned(_pointer + index, value);
         }
 
         /// <summary>
@@ -221,10 +266,10 @@ namespace Spreads.Buffers
         /// <param name="index"> index in bytes from which to get.</param>
         /// <returns>the value at a given index.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public int ReadInt32(long index)
         {
-            Assert(index, 4);
-            return ReadUnaligned<int>(_data + index);
+            return ReadUnaligned<int>(_pointer + index);
         }
 
         /// <summary>
@@ -235,106 +280,129 @@ namespace Spreads.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteInt32(long index, int value)
         {
-            Assert(index, 4);
-            WriteUnaligned(_data + index, value);
+            WriteUnaligned(_pointer + index, value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public int VolatileReadInt32(long index)
         {
-            Assert(index, 4);
-            return Volatile.Read(ref *(int*)(new IntPtr(_data + index)));
+            return Volatile.Read(ref *(int*)(_pointer + index));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void VolatileWriteInt32(long index, int value)
         {
-            Assert(index, 4);
-            Volatile.Write(ref *(int*)(new IntPtr(_data + index)), value);
+            Volatile.Write(ref *(int*)(_pointer + index), value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
+        public uint VolatileReadUInt32(long index)
+        {
+            return Volatile.Read(ref *(uint*)(_pointer + index));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void VolatileWriteUInt32(long index, uint value)
+        {
+            Volatile.Write(ref *(uint*)(_pointer + index), value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public long VolatileReadInt64(long index)
         {
-            Assert(index, 8);
-            return Volatile.Read(ref *(long*)(new IntPtr(_data + index)));
+            return Volatile.Read(ref *(long*)(_pointer + index));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void VolatileWriteUInt64(long index, ulong value)
+        {
+            Volatile.Write(ref *(ulong*)(_pointer + index), value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
+        public ulong VolatileReadUInt64(long index)
+        {
+            return Volatile.Read(ref *(ulong*)(_pointer + index));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void VolatileWriteInt64(long index, long value)
         {
-            Assert(index, 8);
-            Volatile.Write(ref *(long*)(new IntPtr(_data + index)), value);
+            Volatile.Write(ref *(long*)(_pointer + index), value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public int InterlockedIncrementInt32(long index)
         {
-            Assert(index, 4);
-            return Interlocked.Increment(ref *(int*)(new IntPtr(_data + index)));
+            return Interlocked.Increment(ref *(int*)(_pointer + index));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public int InterlockedDecrementInt32(long index)
         {
-            Assert(index, 4);
-            return Interlocked.Decrement(ref *(int*)(new IntPtr(_data + index)));
+            return Interlocked.Decrement(ref *(int*)(_pointer + index));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public int InterlockedAddInt32(long index, int value)
         {
-            Assert(index, 4);
-            return Interlocked.Add(ref *(int*)(new IntPtr(_data + index)), value);
+            return Interlocked.Add(ref *(int*)(_pointer + index), value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public int InterlockedReadInt32(long index)
         {
-            Assert(index, 4);
-            return Interlocked.Add(ref *(int*)(new IntPtr(_data + index)), 0);
+            return Interlocked.Add(ref *(int*)(_pointer + index), 0);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public int InterlockedCompareExchangeInt32(long index, int value, int comparand)
         {
-            Assert(index, 4);
-            return Interlocked.CompareExchange(ref *(int*)(new IntPtr(_data + index)), value, comparand);
+            return Interlocked.CompareExchange(ref *(int*)(_pointer + index), value, comparand);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public long InterlockedIncrementInt64(long index)
         {
-            Assert(index, 8);
-            return Interlocked.Increment(ref *(long*)(new IntPtr(_data + index)));
+            return Interlocked.Increment(ref *(long*)(_pointer + index));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public long InterlockedDecrementInt64(long index)
         {
-            Assert(index, 8);
-            return Interlocked.Decrement(ref *(long*)(new IntPtr(_data + index)));
+            return Interlocked.Decrement(ref *(long*)(_pointer + index));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public long InterlockedAddInt64(long index, long value)
         {
-            Assert(index, 8);
-            return Interlocked.Add(ref *(long*)(new IntPtr(_data + index)), value);
+            return Interlocked.Add(ref *(long*)(_pointer + index), value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public long InterlockedReadInt64(long index)
         {
-            Assert(index, 8);
-            return Interlocked.Add(ref *(long*)(new IntPtr(_data + index)), 0);
+            return Interlocked.Add(ref *(long*)(_pointer + index), 0);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public long InterlockedCompareExchangeInt64(long index, long value, long comparand)
         {
-            Assert(index, 8);
-            return Interlocked.CompareExchange(ref *(long*)(new IntPtr(_data + index)), value, comparand);
+            return Interlocked.CompareExchange(ref *(long*)(_pointer + index), value, comparand);
         }
 
         /// <summary>
@@ -343,10 +411,10 @@ namespace Spreads.Buffers
         /// <param name="index"> index in bytes from which to get.</param>
         /// <returns>the value at a given index.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public long ReadInt64(long index)
         {
-            Assert(index, 8);
-            return ReadUnaligned<long>(_data + index);
+            return ReadUnaligned<long>(_pointer + index);
         }
 
         /// <summary>
@@ -357,8 +425,7 @@ namespace Spreads.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteInt64(long index, long value)
         {
-            Assert(index, 8);
-            WriteUnaligned(_data + index, value);
+            WriteUnaligned(_pointer + index, value);
         }
 
         /// <summary>
@@ -367,10 +434,10 @@ namespace Spreads.Buffers
         /// <param name="index"> index in bytes from which to get.</param>
         /// <returns>the value at a given index.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ushort ReadUint16(long index)
+        [Pure]
+        public ushort ReadUInt16(long index)
         {
-            Assert(index, 2);
-            return ReadUnaligned<ushort>(_data + index);
+            return ReadUnaligned<ushort>(_pointer + index);
         }
 
         /// <summary>
@@ -379,10 +446,9 @@ namespace Spreads.Buffers
         /// <param name="index">index in bytes for where to put.</param>
         /// <param name="value">value to be written</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteUint16(long index, ushort value)
+        public void WriteUInt16(long index, ushort value)
         {
-            Assert(index, 2);
-            WriteUnaligned(_data + index, value);
+            WriteUnaligned(_pointer + index, value);
         }
 
         /// <summary>
@@ -391,10 +457,10 @@ namespace Spreads.Buffers
         /// <param name="index"> index in bytes from which to get.</param>
         /// <returns>the value at a given index.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public uint ReadUint32(long index)
+        [Pure]
+        public uint ReadUInt32(long index)
         {
-            Assert(index, 4);
-            return ReadUnaligned<uint>(_data + index);
+            return ReadUnaligned<uint>(_pointer + index);
         }
 
         /// <summary>
@@ -403,10 +469,9 @@ namespace Spreads.Buffers
         /// <param name="index">index in bytes for where to put.</param>
         /// <param name="value">value to be written</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteUint32(long index, uint value)
+        public void WriteUInt32(long index, uint value)
         {
-            Assert(index, 4);
-            WriteUnaligned(_data + index, value);
+            WriteUnaligned(_pointer + index, value);
         }
 
         /// <summary>
@@ -415,10 +480,10 @@ namespace Spreads.Buffers
         /// <param name="index"> index in bytes from which to get.</param>
         /// <returns>the value at a given index.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong ReadUint64(long index)
+        [Pure]
+        public ulong ReadUInt64(long index)
         {
-            Assert(index, 8);
-            return ReadUnaligned<ulong>(_data + index);
+            return ReadUnaligned<ulong>(_pointer + index);
         }
 
         /// <summary>
@@ -426,10 +491,9 @@ namespace Spreads.Buffers
         /// </summary>
         /// <param name="index">index in bytes for where to put.</param>
         /// <param name="value">value to be written</param>
-        public void WriteUint64(long index, ulong value)
+        public void WriteUInt64(long index, ulong value)
         {
-            Assert(index, 8);
-            WriteUnaligned(_data + index, value);
+            WriteUnaligned(_pointer + index, value);
         }
 
         /// <summary>
@@ -438,10 +502,10 @@ namespace Spreads.Buffers
         /// <param name="index"> index in bytes from which to get.</param>
         /// <returns>the value at a given index.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public float ReadFloat(long index)
         {
-            Assert(index, 4);
-            return ReadUnaligned<float>(_data + index);
+            return ReadUnaligned<float>(_pointer + index);
         }
 
         /// <summary>
@@ -452,8 +516,7 @@ namespace Spreads.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteFloat(long index, float value)
         {
-            Assert(index, 4);
-            WriteUnaligned(_data + index, value);
+            WriteUnaligned(_pointer + index, value);
         }
 
         /// <summary>
@@ -462,10 +525,10 @@ namespace Spreads.Buffers
         /// <param name="index"> index in bytes from which to get.</param>
         /// <returns>the value at a given index.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public double ReadDouble(long index)
         {
-            Assert(index, 8);
-            return ReadUnaligned<double>(_data + index);
+            return ReadUnaligned<double>(_pointer + index);
         }
 
         /// <summary>
@@ -476,203 +539,134 @@ namespace Spreads.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteDouble(long index, double value)
         {
-            Assert(index, 8);
-            WriteUnaligned(_data + index, value);
+            WriteUnaligned(_pointer + index, value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
+        public T Read<T>(long index)
+        {
+            return ReadUnaligned<T>(_pointer + index);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public int Read<T>(long index, out T value)
         {
             var size = SizeOf<T>();
-            Assert(index, size);
-            value = ReadUnaligned<T>(_data + index);
+            value = ReadUnaligned<T>(_pointer + index);
             return size;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Write<T>(long index, T value)
         {
-            Assert(index, SizeOf<T>());
-            WriteUnaligned(_data + index, value);
+            WriteUnaligned(_pointer + index, value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear(long index, int length)
         {
-            Assert(index, length);
-            var destination = new IntPtr(_data + index);
-            Unsafe.InitBlockUnaligned((void*)destination, 0, (uint)length);
+            var destination = _pointer + index;
+            InitBlockUnaligned(destination, 0, (uint)length);
         }
 
+        /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
+        // ReSharper disable once InconsistentNaming
+        public UUID ReadUUID(long index)
+        {
+            return ReadUnaligned<UUID>(_pointer + index);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        // ReSharper disable once InconsistentNaming
+        public void WriteUUID(long index, UUID value)
+        {
+            WriteUnaligned(_pointer + index, value);
+        }*/
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Pure]
         public int ReadAsciiDigit(long index)
         {
-            Assert(index, 1);
-            return ReadUnaligned<byte>(_data + index) - '0';
+            return ReadUnaligned<byte>(_pointer + index) - '0';
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteAsciiDigit(long index, byte value)
         {
-            Assert(index, 1);
-            WriteUnaligned(_data + index, (byte)(value + '0'));
+            WriteUnaligned(_pointer + index, (byte)(value + '0'));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void VerifyAlignment(int alignment)
         {
-            if (0 != ((long)_data & (alignment - 1)))
+            if (0 != ((long)_pointer & (alignment - 1)))
             {
                 throw new InvalidOperationException(
-                    $"DirectBuffer is not correctly aligned: addressOffset={(long)_data:D} in not divisible by {alignment:D}");
+                    $"DirectBuffer is not correctly aligned: addressOffset={(long)_pointer:D} in not divisible by {alignment:D}");
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void CopyTo(long index, Memory<byte> destination, int length)
+        public void CopyTo(ref Memory<byte> destination)
         {
-            if ((ulong)destination.Length < (ulong)length)
+            Span.CopyTo(destination.Span);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void CopyTo(in DirectBuffer destination)
+        {
+            CopyTo(0, destination.Data, (int)_length);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void CopyTo(long index, void* destination, int length)
+        {
+            CopyBlockUnaligned(destination, _pointer + index, checked((uint)length));
+        }
+
+        #region Debugger proxy class
+
+        // ReSharper disable once InconsistentNaming
+        internal class SpreadsBuffers_DirectBufferDebugView
+        {
+            private readonly DirectBuffer _db;
+
+            public SpreadsBuffers_DirectBufferDebugView(DirectBuffer db)
             {
-                throw new ArgumentOutOfRangeException();
+                _db = db;
             }
 
-            fixed (byte* destPtr = &MemoryMarshal.GetReference(destination.Span))
-            {
-                CopyTo(index, (IntPtr)destPtr, length);
-            }
+            public void* Data => _db.Data;
+
+            public long Length => _db.Length;
+
+            public bool IsValid => _db.IsValid;
+
+            public Span<byte> Span => _db.IsValid ? _db.Span : default;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void CopyTo(long index, DirectBuffer destination, int destinationOffset, int length)
+        #endregion Debugger proxy class
+    }
+
+    public static unsafe class DirectBufferExtensions
+    {
+        public static string GetString(this Encoding encoding, in DirectBuffer buffer)
         {
-            destination.Assert(destinationOffset, length);
-            CopyTo(index, destination.Data + destinationOffset, length);
+            return encoding.GetString(buffer._pointer, buffer.Length);
         }
 
+        /// <summary>
+        /// For usage: using (array.AsDirectBuffer(out var db)) { ... }
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void CopyTo(long index, IntPtr destination, int length)
+        public static MemoryHandle AsDirectBuffer(this byte[] array, out DirectBuffer buffer)
         {
-            Assert(index, length);
-            CopyBlockUnaligned((byte*)destination, _data + index, checked((uint)length));
+            var mh = ((Memory<byte>)array).Pin();
+            buffer = new DirectBuffer(array.Length, (byte*)mh.Pointer);
+            return mh;
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void CopyFrom(long index, ReadOnlyMemory<byte> source, int length)
-        {
-            if ((ulong)source.Length < (ulong)length)
-            {
-                throw new ArgumentOutOfRangeException();
-            }
-
-            fixed (byte* srcPtr = &MemoryMarshal.GetReference(source.Span))
-            {
-                CopyFrom(index, (IntPtr)srcPtr, length);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void CopyFrom(long index, DirectBuffer source, int sourceOffset, int length)
-        {
-            source.Assert(sourceOffset, length);
-            CopyFrom(index, source.Data + sourceOffset, length);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void CopyFrom(long index, IntPtr source, int length)
-        {
-            Assert(index, length);
-            CopyBlockUnaligned(_data + index, (byte*)source, checked((uint)length));
-        }
-
-        ///// <summary>
-        ///// Copy this buffer to a pointer
-        ///// </summary>
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public void Copy(IntPtr destination, long srcOffset, long length)
-        //{
-        //    Assert(srcOffset, length);
-        //    CopyBlockUnaligned((byte*)destination, _data + srcOffset, checked((uint)length));
-        //}
-
-        ///// <summary>
-        ///// Copy this buffer to a byte array
-        ///// </summary>
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public void Copy(byte[] destination, int destOffset, int srcOffset, int length)
-        //{
-        //    if ((ulong)destOffset + (ulong)length > (ulong)destination.Length)
-        //    {
-        //        ThrowHelper.ThrowArgumentOutOfRangeException();
-        //    }
-        //    fixed (byte* dstPtr = &destination[destOffset])
-        //    {
-        //        Copy((IntPtr)dstPtr, srcOffset, length);
-        //    }
-        //}
-
-        ///// <summary>
-        ///// Copies a range of bytes from the underlying into a supplied byte array.
-        ///// </summary>
-        ///// <param name="index">index  in the underlying buffer to start from.</param>
-        ///// <param name="destination">array into which the bytes will be copied.</param>
-        ///// <param name="destinationOffset">offset in the supplied buffer to start the copy</param>
-        ///// <param name="length">length of the supplied buffer to use.</param>
-        ///// <returns>count of bytes copied.</returns>
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public int CopyTo(long index, byte[] destination, int destinationOffset, int length)
-        //{
-        //    if (length > _length - index) throw new ArgumentException("length > _capacity - index");
-        //    Marshal.Copy(new IntPtr(_data.ToInt64() + index), destination, destinationOffset, length);
-        //    return length;
-        //}
-
-        ///// <summary>
-        ///// Writes a byte array into the underlying buffer.
-        ///// </summary>
-        ///// <param name="index">index  in the underlying buffer to start from.</param>
-        ///// <param name="source">source byte array to be copied to the underlying buffer.</param>
-        ///// <param name="srcOffset">offset in the supplied buffer to begin the copy.</param>
-        ///// <param name="length">length of the supplied buffer to copy.</param>
-        ///// <returns>count of bytes copied.</returns>
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public int CopyFrom(long index, byte[] source, int srcOffset, int length)
-        //{
-        //    Assert(index, length);
-        //    if (source.Length < srcOffset + length)
-        //    {
-        //        ThrowHelper.ThrowArgumentOutOfRangeException();
-        //    }
-        //    //int count = Math.Min(len, (int)(this._length - index));
-        //    Marshal.Copy(source, srcOffset, new IntPtr(_data.ToInt64() + index), length);
-
-        //    return length;
-        //}
-
-        ////[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        ////public int Write<T>(long index, T value, MemoryStream ms = null)
-        ////{
-        ////    return Serialization.BinarySerializer.Write<T>(value, ref this, checked((uint)index), ms);
-        ////}
-
-        ///// <summary>
-        ///// Writes len bytes from source to this buffer at index. Works as memcpy, not memmove.
-        ///// </summary>
-        ///// <param name="index"></param>
-        ///// <param name="src"></param>
-        ///// <param name="srcOffset"></param>
-        ///// <param name="length"></param>
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public void WriteBytes(long index, DirectBuffer src, long srcOffset, long length)
-        //{
-        //    Assert(index, length);
-        //    if ((ulong)src._length < (ulong)srcOffset + (ulong)length)
-        //    {
-        //        ThrowHelper.ThrowArgumentOutOfRangeException();
-        //    }
-        //    var source = src._data + srcOffset;
-        //    var destination = _data + index;
-        //    CopyBlockUnaligned(destination, source, checked((uint)length));
-        //}
     }
 }

@@ -152,10 +152,13 @@ namespace Ace.Networking.MicroProtocol
             if (_headerObject.PacketType == PacketType.RawData)
                 _bytesLeftForCurrentState = (_headerObject as RawDataHeader)?.ContentLength ?? -1;
 
-            
+
 
             if (_headerObject.PacketFlag.HasFlag(PacketFlag.NoContent) || _bytesLeftForCurrentState == 0)
+            {
                 _bytesLeftForCurrentState = -1;
+                _contentStream = null;
+            }
             else
             {
                 _contentStream = MemoryManager.Instance.GetStream(string.Empty, _bytesLeftForCurrentState);
@@ -196,11 +199,18 @@ namespace Ace.Networking.MicroProtocol
             {
                 var contentType = content.ContentType;
                 var packet = new DefaultContentPacket(content, null);
-                var message = Serializer.Deserialize(contentType, _contentStream, out var resolvedType);
-                packet.Payload = message;
-                packet.Type = resolvedType;
-
-                if (packet.Payload != null) PacketReceived(packet.Header, packet.Payload, packet.Type);
+                if (_contentStream == null)
+                {
+                    packet.Payload = null;
+                    packet.Type = typeof(object);
+                }
+                else
+                {
+                    var message = Serializer.Deserialize(contentType, _contentStream, out var resolvedType);
+                    packet.Payload = message;
+                    packet.Type = resolvedType;
+                }
+                PacketReceived(packet.Header, packet.Payload, packet.Type);
                 isProcessed = true;
             }
 

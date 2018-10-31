@@ -26,7 +26,7 @@ namespace Ace.Networking
     {
         public delegate void DisconnectHandler(IConnection connection, Exception exception);
 
-        public delegate void InternalPayloadDispatchHandler(Connection connection, object payload, Type type,
+        public delegate bool InternalPayloadDispatchHandler(Connection connection, object payload, Type type,
             Action<object> responseSender, int? requestId);
 
         public delegate bool PayloadFilter(object payload, Type type);
@@ -147,6 +147,7 @@ namespace Ace.Networking
         public ISslCertificatePair SslCertificates { get; private set; }
 
         public IPayloadSerializer Serializer => _encoder?.Serializer ?? _decoder?.Serializer;
+        public ITypeResolver TypeResolver => Serializer.TypeResolver;
         public IServiceManager<IConnection> Services => _services;
 
         public long Identifier { get; }
@@ -309,27 +310,30 @@ namespace Ace.Networking
         private void OnPayloadReceived(BasicHeader header, object obj, Type type)
         {
             int? unboxedRequest = null;
-            var isUnhandledRequest = false;
+            bool handled = false;
+
             if (header.PacketType == PacketType.Trackable)
                 if (header is TrackableHeader tHeader)
                 {
                     if (header.PacketFlag.HasFlag(PacketFlag.IsRequest))
                     {
-                        isUnhandledRequest = true;
                         unboxedRequest = tHeader.RequestId;
                         if (_requestHandlers.TryGetValue(type, out var queue))
                         {
                             var wrapper = new RequestWrapper(this, tHeader.RequestId, obj);
                             lock (queue)
                             {
-                                isUnhandledRequest = queue.Count == 0;
-                                while (queue.Count > 0) queue.Dequeue()?.TrySetResult(wrapper);
+                                while (queue.Count > 0) handled |= queue.Dequeue()?.TrySetResult(wrapper) ?? false;
                             }
                         }
                     }
                     else if (header.PacketFlag.HasFlag(PacketFlag.IsResponse))
                     {
-                        if (_responseHandlers.TryRemove(tHeader.RequestId, out var tcs)) tcs.TrySetResult(obj);
+                        if (_responseHandlers.TryRemove(tHeader.RequestId, out var tcs))
+                        {
+                            handled = true;
+                            tcs.TrySetResult(obj);
+                        }
                     }
                 }
 
@@ -337,9 +341,9 @@ namespace Ace.Networking
             void SendResponse(object o)
             {
                 if (o == null) return;
+                handled = true;
                 if (unboxedRequest.HasValue)
                 {
-                    isUnhandledRequest = false;
                     EnqueueSendResponse(((TrackableHeader) header).RequestId, o);
                 }
                 else
@@ -381,7 +385,7 @@ namespace Ace.Networking
                     }
                 }
 
-            ProcessPayloadHandlers(this, obj, type, SendResponse, unboxedRequest);
+            handled |= ProcessPayloadHandlers(this, obj, type, SendResponse, unboxedRequest);
 
             try
             {
@@ -394,15 +398,16 @@ namespace Ace.Networking
 
             try
             {
-                PayloadDispatchHandler?.Invoke(this, obj, type, SendResponse, unboxedRequest);
+                handled |= PayloadDispatchHandler?.Invoke(this, obj, type, SendResponse, unboxedRequest) ?? false;
             }
             catch
             {
                 // ignored
             }
 
-            //if(isUnhandledRequest)
-            //    EnqueueSendResponse<object>(((TrackableHeader)header).RequestId, null);
+            if (!handled && unboxedRequest.HasValue)
+                EnqueueSendPacket(new TrackablePacket<object>(
+                    new TrackableHeader(unboxedRequest.Value, PacketFlag.IsResponse | PacketFlag.NoContent), null));
 
             //TODO: Inconsistencies
             // Order:
@@ -425,9 +430,8 @@ namespace Ace.Networking
             }
 
             if (_rawDataHandlers.Count > 0)
-                if (_rawDataHandlers.ContainsKey(bufferId))
+                if (_rawDataHandlers.TryGetValue(bufferId, out var list))
                 {
-                    var list = _rawDataHandlers[bufferId];
                     lock (list)
                     {
                         foreach (var handler in list)
@@ -860,22 +864,23 @@ namespace Ace.Networking
         }
 
 
-        public void AppendIncomingRawDataHandler(int bufId, RawDataHandler handler)
+        public void OnRaw(int bufId, RawDataHandler handler)
         {
-            if (!_rawDataHandlers.ContainsKey(bufId)) _rawDataHandlers.TryAdd(bufId, new LinkedList<RawDataHandler>());
-            lock (_rawDataHandlers[bufId])
+            if (!_rawDataHandlers.TryGetValue(bufId, out var list))
+                _rawDataHandlers.TryAdd(bufId, list = new LinkedList<RawDataHandler>());
+            lock (list)
             {
-                _rawDataHandlers[bufId].AddLast(handler);
+                list.AddLast(handler);
             }
         }
 
-        public bool RemoveIncomingRawDataHandler(int bufId, RawDataHandler handler)
+        public bool OffRaw(int bufId, RawDataHandler handler)
         {
-            if (!_rawDataHandlers.ContainsKey(bufId)) return false;
+            if (!_rawDataHandlers.TryGetValue(bufId, out var list)) return false;
             bool ret;
-            lock (_rawDataHandlers[bufId])
+            lock (list)
             {
-                ret = _rawDataHandlers[bufId].Remove(handler);
+                ret = list.Remove(handler);
             }
 
             return ret;

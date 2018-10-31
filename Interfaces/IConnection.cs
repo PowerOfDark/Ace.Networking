@@ -19,5 +19,11 @@ namespace Ace.Networking.Interfaces
 
         event GlobalPayloadHandler PayloadSent;
         event RawDataHeader.RawDataHandler RawDataReceived;
+
+
+        int CreateNewRawDataBuffer();
+        bool DestroyRawDataBuffer(int bufId);
+        void OnRaw(int bufId, RawDataHeader.RawDataHandler handler);
+        bool OffRaw(int bufId, RawDataHeader.RawDataHandler handler);
     }
 }
