@@ -27,10 +27,16 @@ namespace Ace.Networking
             return this;
         }
 
+        public IConnectionBuilder UseServices<TBuilder>(Func<TBuilder, IServicesBuilder<IConnection>> config) where TBuilder : IServicesBuilder<IConnection>
+        {
+            var builder = Activator.CreateInstance<TBuilder>();
+            _services = config.Invoke(builder);
+            return this;
+        }
+
         public IConnectionBuilder UseServices(Func<IServicesBuilder<IConnection>, IServicesBuilder<IConnection>> config)
         {
-            _services = config.Invoke(new ServicesBuilder<IConnection>());
-            return this;
+            return UseServices<ServicesBuilder<IConnection>>(config);
         }
 
         public IConnectionBuilder UseData(IConnectionData data)
@@ -59,6 +65,18 @@ namespace Ace.Networking
         {
             _dispatcher += dispatcher;
             return this;
+        }
+
+        public IPayloadSerializer GetSerializer()
+        {
+            if (_config == null) _config = new ProtocolConfiguration();
+            return _config.Serializer;
+        }
+
+        public ITypeResolver GetTypeResolver()
+        {
+            if (_config == null) _config = new ProtocolConfiguration();
+            return _config.TypeResolver;
         }
     }
 }

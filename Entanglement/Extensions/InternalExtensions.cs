@@ -21,7 +21,16 @@ namespace Ace.Networking.Entanglement.Extensions
         {
             using (var ms = MemoryManager.Instance.GetStream())
             {
-                serializer.Serialize(obj, ms);
+                serializer.Serialize(obj, ms, out _);
+                return ms.ToArray();
+            }
+        }
+
+        public static byte[] SerializeContent(object obj, IPayloadSerializer serializer)
+        {
+            using (var ms = MemoryManager.Instance.GetStream())
+            {
+                serializer.SerializeContent(obj, ms);
                 return ms.ToArray();
             }
         }

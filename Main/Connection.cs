@@ -26,7 +26,7 @@ namespace Ace.Networking
     {
         public delegate void DisconnectHandler(IConnection connection, Exception exception);
 
-        public delegate bool InternalPayloadDispatchHandler(Connection connection, object payload, Type type,
+        public delegate bool InternalPayloadDispatchHandler(IConnection connection, object payload, Type type,
             Action<object> responseSender, int? requestId);
 
         public delegate bool PayloadFilter(object payload, Type type);
@@ -88,7 +88,7 @@ namespace Ace.Networking
         private Stream _stream;
         private SocketBuffer _writeBuffer;
 
-        public InternalPayloadDispatchHandler PayloadDispatchHandler;
+        public event InternalPayloadDispatchHandler DispatchPayload;
 
         private Connection(IPayloadEncoder encoder, IPayloadDecoder decoder)
         {
@@ -122,7 +122,7 @@ namespace Ace.Networking
             _services = services; // ?? BasicServiceManager<IConnection>.Empty;
             _sslFactory = sslFactory;
             Data = data;
-            PayloadDispatchHandler = dispatcher;
+            DispatchPayload = dispatcher;
         }
 
         public bool UseCustomOutcomingMessageQueue => CustomOutcomingMessageQueue != null;
@@ -344,6 +344,7 @@ namespace Ace.Networking
                 handled = true;
                 if (unboxedRequest.HasValue)
                 {
+                    //unboxedRequest = null;
                     EnqueueSendResponse(((TrackableHeader) header).RequestId, o);
                 }
                 else
@@ -398,7 +399,14 @@ namespace Ace.Networking
 
             try
             {
-                handled |= PayloadDispatchHandler?.Invoke(this, obj, type, SendResponse, unboxedRequest) ?? false;
+                if (DispatchPayload != null)
+                {
+                    foreach (var handler in DispatchPayload.GetInvocationList())
+                    {
+                        if (handler is InternalPayloadDispatchHandler h)
+                            handled |= h.Invoke(this, obj, type, SendResponse, unboxedRequest);
+                    }
+                }
             }
             catch
             {

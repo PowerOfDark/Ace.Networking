@@ -13,7 +13,7 @@ namespace Ace.Networking.Serializers.Protobuf
 
         public override IPayloadSerializer Clone()
         {
-            return new ProtobufSerializer(this.TypeResolver);
+            return this;
         }
 
         public override object DeserializeType(Type type, Stream source)
@@ -21,7 +21,7 @@ namespace Ace.Networking.Serializers.Protobuf
             return Serializer.NonGeneric.Deserialize(type, source);
         }
 
-        public override void Serialize(object source, Stream destination)
+        public override void SerializeContent(object source, Stream destination)
         {
             Serializer.NonGeneric.Serialize(destination, source);
         }

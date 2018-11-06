@@ -28,7 +28,7 @@ namespace Ace.Networking.Serializers.TypeResolvers
                 guid = GetRepresentationUtil(type.BaseType, depth+1);
             }
 
-            
+           
             for (int i = 0; i < 16; i++) guid[i] ^= (h = (byte) ((31 * h) + (depth* depth^0b0001100101)));
             if (type.IsGenericType)
             {

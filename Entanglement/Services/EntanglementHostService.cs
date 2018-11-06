@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Ace.Networking.Entanglement.Packets;
 using Ace.Networking.Entanglement.ProxyImpl;
@@ -9,6 +10,7 @@ using Ace.Networking.Entanglement.Services;
 using Ace.Networking.Entanglement.Structures;
 using Ace.Networking.Handlers;
 using Ace.Networking.Interfaces;
+using Ace.Networking.MicroProtocol.Interfaces;
 
 namespace Ace.Networking.Entanglement
 {
@@ -33,19 +35,26 @@ namespace Ace.Networking.Entanglement
         protected HashSet<ICommon> BoundInterfaces { get; } =
             new HashSet<ICommon>();
 
+        protected ICommon Host => BoundInterfaces.FirstOrDefault();
+
         public bool IsActive => BoundInterfaces.Count > 0;
 
         public void Attach(ICommon server)
         {
             if (BoundInterfaces.Contains(server)) return;
+            if (BoundInterfaces.Any())
+                throw new NotSupportedException("Only single host is allowed");
+
             BoundInterfaces.Add(server);
+
+            foreach (var type in Interfaces)
+                RegisterTypes(server.TypeResolver, type.Value);
 
             server.ClientDisconnected += Server_ClientDisconnected;
 
             server.OnRequest<ExecuteMethod>(OnRequestExecuteMethodResult);
             server.OnRequest<EntangleRequest>(OnRequestEntangle);
             server.OnRequest<UpdateRequest>(OnRequestUpdate);
-            Console.WriteLine("Entanglement service online!");
         }
 
         public void Detach(ICommon server)
@@ -58,6 +67,7 @@ namespace Ace.Networking.Entanglement
             server.OffRequest<EntangleRequest>(OnRequestEntangle);
             server.OffRequest<UpdateRequest>(OnRequestUpdate);
         }
+
 
         public EntangledHostedObjectBase GetHostedObject(Guid eid)
         {
@@ -72,12 +82,34 @@ namespace Ace.Networking.Entanglement
             return GetInstance(ie, scope);
         }
 
+        private void RegisterTypes(ITypeResolver resolver, InterfaceEntry entry)
+        {
+            if (resolver == null) throw new ArgumentNullException(nameof(resolver));
+            if (entry == null) throw new ArgumentNullException(nameof(entry));
+
+            foreach (var ml in entry.InterfaceDescriptor.Methods)
+            {
+                foreach (var m in ml.Value)
+                {
+                    resolver.RegisterType(m.RealReturnType);
+                    foreach (var p in m.Parameters)
+                        Host.TypeResolver.RegisterType(p.Type);
+                }
+            }
+
+            foreach (var pl in entry.InterfaceDescriptor.Properties)
+            {
+                resolver.RegisterType(pl.Value.Property.PropertyType);
+            }
+        }
+
 
         private void Register(Type baseType, Type type, EntanglementAccess access)
         {
             var guid = baseType.GetTypeInfo().GUID;
+            InterfaceEntry e;
             if (!Interfaces.TryAdd(guid,
-                new InterfaceEntry
+                e = new InterfaceEntry
                 {
                     Access = access,
                     Type = type,
@@ -85,6 +117,9 @@ namespace Ace.Networking.Entanglement
                     InterfaceDescriptor = InterfaceDescriptor.Get(baseType)
                 }))
                 Interfaces[guid].Access = access;
+            if (Host?.TypeResolver != null)
+                RegisterTypes(Host.TypeResolver, e);
+
         }
 
         public IEntanglementHostService Register<TBase, T>(EntanglementAccess access)
@@ -97,14 +132,14 @@ namespace Ace.Networking.Entanglement
 
         public IEntanglementHostService RegisterAll(string namespaceBase = null, Assembly assembly = null)
         {
-            if (assembly == null)
+            if (assembly == null)   
                 assembly = Assembly.GetEntryAssembly();
             var dot = (namespaceBase??string.Empty) + ".";
             foreach (var type in assembly.GetTypes())
             {
                 var attr = type.GetTypeInfo().GetCustomAttribute<EntanglementAttribute>();
                 if (attr == null) continue;
-                if (namespaceBase == null || type.Namespace == namespaceBase || type.Namespace.StartsWith(dot))
+                if (namespaceBase == null || type.Namespace == namespaceBase || (type.Namespace?.StartsWith(dot)??false))
                 {
                     Register(attr.Interface, type, attr.Access);
                 }
@@ -166,7 +201,7 @@ namespace Ace.Networking.Entanglement
                     break;
             }
 
-            Objects[eid] = (EntangledHostedObjectBase) Activator.CreateInstance(ie.Type, eid, ie.InterfaceDescriptor);
+            Objects[eid] = (EntangledHostedObjectBase) Activator.CreateInstance(ie.Type, eid, ie.InterfaceDescriptor, Host);
             return eid;
         }
 
@@ -178,9 +213,7 @@ namespace Ace.Networking.Entanglement
 
         private bool OnRequestEntangle(IRequestWrapper request)
         {
-            Console.WriteLine("On request entangle");
             var req = (EntangleRequest) request.Request;
-
             Guid? eid = null;
 
             if (Interfaces.TryGetValue(req.InterfaceId, out var ie))

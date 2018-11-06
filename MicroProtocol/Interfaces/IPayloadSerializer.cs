@@ -8,12 +8,11 @@ namespace Ace.Networking.MicroProtocol.Interfaces
     {
         byte[] SupportedContentType { get; }
         ITypeResolver TypeResolver { get; }
-
         object Deserialize(byte[] contentType, Stream source, out Type resolvedType);
         object DeserializeType(Type type, Stream source);
 
         void Serialize(object source, Stream destination, out byte[] contentType);
-        void Serialize(object source, Stream destination);
+        void SerializeContent(object source, Stream destination);
 
         IPayloadSerializer Clone();
 

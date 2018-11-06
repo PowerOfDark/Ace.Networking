@@ -20,7 +20,7 @@ namespace Ace.Networking.Serializers
             return MessagePackSerializer.NonGeneric.Deserialize(type, source);
         }
 
-        public override void Serialize(object source, Stream destination)
+        public override void SerializeContent(object source, Stream destination)
         {
             MessagePackSerializer.NonGeneric.Serialize(source.GetType(), destination, source,
                 ContractlessStandardResolver.Instance);
@@ -28,7 +28,7 @@ namespace Ace.Networking.Serializers
 
         public override IPayloadSerializer Clone()
         {
-            return new MsgPackSerializer(this.TypeResolver);
+            return this;
         }
     }
 }

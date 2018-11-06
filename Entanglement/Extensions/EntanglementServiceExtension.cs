@@ -11,7 +11,7 @@ namespace Ace.Networking.Entanglement.Extensions
             Action<IEntanglementHostService> config = null) where T : class, ICommon
         {
             var instance = new EntanglementHostService();
-            services.Add<IEntanglementHostService, EntanglementHostService>(instance);
+            services.Add<IEntanglementHostService, EntanglementHostService>(instance, config);
             config?.Invoke(instance);
             return services;
         }

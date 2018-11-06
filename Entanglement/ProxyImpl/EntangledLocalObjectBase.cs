@@ -26,24 +26,28 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
         public ExecuteMethod GetExecuteMethodDescriptor(string name, Type returnType, params object[] arg)
         {
+            byte[][] arguments = null;
+            if ((arg?.Length??0) > 0)
+            {
+                arguments = new byte[arg.Length][];
+                using (var mm = MemoryManager.Instance.GetStream())
+                {
+                    int i = 0;
+                    foreach (var a in arg)
+                    {
+                        mm.SetLength(0);
+                        Host.Serializer.Serialize(a, mm, out _);
+                        arguments[i++] = mm.ToArray();
+                    }
+                }
+
+            }
             var exe = new ExecuteMethod
             {
                 Eid = _Eid,
-                Arguments = arg?.Select(t =>
-                {
-                    using (var ms = MemoryManager.Instance.GetStream())
-                    {
-                        Host.Serializer.Serialize(t, ms);
-                        var p = new MethodParameter
-                        {
-                            FullName = t.GetType().FullName,
-                            SerializedData = ms.ToArray()
-                        };
-                        return p;
-                    }
-                }).ToArray(),
+                Arguments = arguments,
                 Method = name,
-                ReturnValueFullName = returnType.FullName
+                _ReturnType = returnType
             };
             return exe;
         }
@@ -77,7 +81,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                         using (var ms = new MemoryStream(update.SerializedData))
                         {
                             prop.BackingField.SetValue(this,
-                                host.Serializer.DeserializeType(prop.BackingField.FieldType, ms));
+                                host.Serializer.Deserialize(Host.Serializer.SupportedContentType, ms, out _));
                         }
             }
 

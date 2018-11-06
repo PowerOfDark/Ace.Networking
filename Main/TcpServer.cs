@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Ace.Networking.Handlers;
 using Ace.Networking.Interfaces;
+using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.SSL;
 using Ace.Networking.Services;
 using static Ace.Networking.Connection;
@@ -30,15 +31,21 @@ namespace Ace.Networking
         private TimeSpan? _receiveTimeoutCheck;
         private volatile bool _shuttingDown;
 
+        
+
         public TcpServer(IPEndPoint endpoint, IConnectionBuilder connectionBuilder,
             IInternalServiceManager<IServer> services = null)
         {
             Connections = new ConcurrentDictionary<long, IConnection>();
             Endpoint = endpoint;
             ConnectionBuilder = connectionBuilder.UseDispatcher(Con_DispatchPayload);
+            
             _timer = new Timer(Timer_Tick, null, 0, System.Threading.Timeout.Infinite);
             _services = services ?? ServicesManager<IServer>.Empty;
         }
+
+        public ITypeResolver TypeResolver => ConnectionBuilder?.GetTypeResolver();
+        public IPayloadSerializer Serializer => ConnectionBuilder?.GetSerializer();
 
         protected IConnectionBuilder ConnectionBuilder { get; }
 
@@ -84,6 +91,8 @@ namespace Ace.Networking
         public event ClientAcceptedHandler ClientAccepted;
         public event DisconnectHandler ClientDisconnected;
         public event GlobalPayloadHandler PayloadReceived;
+
+        public event InternalPayloadDispatchHandler DispatchPayload;
 
         /// <summary>
         ///     Triggers after a connection has been idle for the specified TimeSpan (<see cref="ReceiveTimeout" />)
@@ -236,7 +245,7 @@ namespace Ace.Networking
             Connections.TryRemove(connection.Identifier, out _);
         }
 
-        private bool Con_DispatchPayload(Connection connection, object payload, Type type,
+        private bool Con_DispatchPayload(IConnection connection, object payload, Type type,
             Action<object> responseSender, int? requestId)
         {
             bool ret = ProcessPayloadHandlers(connection, payload, type, responseSender, requestId);
@@ -248,6 +257,24 @@ namespace Ace.Networking
             {
                 // ignored
             }
+
+            if (DispatchPayload != null)
+            {
+                foreach (var @delegate in DispatchPayload.GetInvocationList())
+                {
+                    
+                    try
+                    {
+                        var h = (InternalPayloadDispatchHandler)@delegate;
+                        ret |= h(connection, payload, type, responseSender, requestId);
+                    }
+                    catch
+                    {
+                        //ignored
+                    }
+                }
+            }
+
             return ret;
 
             //TODO: Inconsistencies

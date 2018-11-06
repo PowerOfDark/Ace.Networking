@@ -36,7 +36,7 @@ namespace Ace.Networking.Serializers
                 ContractlessStandardResolver.Instance);
         }
 
-        public void Serialize(object source, Stream destination)
+        public void SerializeContent(object source, Stream destination)
         {
             var type = source?.GetType() ?? typeof(object);
             MessagePackSerializer.NonGeneric.Serialize(type, destination, source,

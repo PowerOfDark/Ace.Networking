@@ -10,7 +10,6 @@ namespace Ace.Networking.Interfaces
     {
         long Identifier { get; }
         Guid Guid { get; }
-        IPayloadSerializer Serializer { get; }
         IConnectionData Data { get; }
         bool Connected { get; }
         DateTime LastReceived { get; }
