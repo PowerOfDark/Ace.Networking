@@ -23,55 +23,64 @@ namespace Ace.Networking.Entanglement.Packets
 
         public void PreSerialize(IPayloadSerializer serializer, Stream stream)
         {
-            var success = false;
-            if (_ReturnType != null)
-                using (var mm = MemoryManager.Instance.GetStream())
-                {
-                    success = serializer.TypeResolver.TryWrite(mm, _ReturnType);
-                    if (success)
-                        ReturnType = mm.ToArray();
-                }
+            lock (Method)
+            {
+                var success = false;
+                if (_ReturnType != null)
+                    using (var mm = MemoryManager.Instance.GetStream())
+                    {
+                        success = serializer.TypeResolver.TryWrite(mm, _ReturnType);
+                        if (success)
+                            ReturnType = mm.ToArray();
+                    }
 
-            if (!success)
-                ReturnType = new byte[0];
+                if (!success)
+                    ReturnType = new byte[0];
+            }
         }
 
         public void PostSerialize(IPayloadSerializer serializer, Stream stream)
         {
-            ReturnType = null;
+            lock (Method)
+            {
+                ReturnType = null;
+            }
         }
 
         public void PostDeserialize(IPayloadSerializer serializer, Stream stream)
         {
-            if (ReturnType == null || ReturnType.Length == 0) _ReturnType = null;
-            else
-                using (var mm = new MemoryStream(ReturnType))
-                {
-                    if (!serializer.TypeResolver.TryResolve(mm, out _ReturnType))
-                        _ReturnType = null;
-                }
-
-            if (Arguments == null || Arguments.Length == 0)
+            lock (Method)
             {
-                Types = null;
-                Objects = null;
-            }
-            else
-            {
-                Types = new Type[Arguments.Length];
-                Objects = new object[Arguments.Length];
-                for (var i = 0; i < Arguments.Length; i++)
-                {
-                    var arg = Arguments[i];
-                    using (var mm = new MemoryStream(arg))
+                if (ReturnType == null || ReturnType.Length == 0) _ReturnType = null;
+                else
+                    using (var mm = new MemoryStream(ReturnType))
                     {
-                        Objects[i] = serializer.Deserialize(serializer.SupportedContentType, mm, out Types[i]);
+                        if (!serializer.TypeResolver.TryResolve(mm, out _ReturnType))
+                            _ReturnType = null;
+                    }
+
+                if (Arguments == null || Arguments.Length == 0)
+                {
+                    Types = null;
+                    Objects = null;
+                }
+                else
+                {
+                    Types = new Type[Arguments.Length];
+                    Objects = new object[Arguments.Length];
+                    for (var i = 0; i < Arguments.Length; i++)
+                    {
+                        var arg = Arguments[i];
+                        using (var mm = new MemoryStream(arg))
+                        {
+                            Objects[i] = serializer.Deserialize(serializer.SupportedContentType, mm, out Types[i]);
+                        }
                     }
                 }
-            }
 
-            Arguments = null;
-            ReturnType = null;
+                Arguments = null;
+                ReturnType = null;
+            }
         }
     }
 }

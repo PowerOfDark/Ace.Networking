@@ -31,51 +31,59 @@ namespace Ace.Networking.Entanglement.Packets
 
         public void PreSerialize(IPayloadSerializer serializer, Stream stream)
         {
-            if ((Objects?.Length ?? 0) > 0)
+            lock (Event)
             {
-                Arguments = new byte[Objects.Length][];
-                using (var mm = MemoryManager.Instance.GetStream())
+                if ((Objects?.Length ?? 0) > 0)
                 {
-                    int i = 0;
-                    foreach (var a in Objects)
+                    Arguments = new byte[Objects.Length][];
+                    using (var mm = MemoryManager.Instance.GetStream())
                     {
-                        mm.SetLength(0);
-                        serializer.Serialize(a, mm, out _);
-                        Arguments[i++] = mm.ToArray();
+                        int i = 0;
+                        foreach (var a in Objects)
+                        {
+                            mm.SetLength(0);
+                            serializer.Serialize(a, mm, out _);
+                            Arguments[i++] = mm.ToArray();
+                        }
                     }
+
                 }
-
             }
-
         }
 
         public void PostSerialize(IPayloadSerializer serializer, Stream stream)
         {
-            Arguments = null;
+            lock (Event)
+            {
+                Arguments = null;
+            }
         }
 
         public void PostDeserialize(IPayloadSerializer serializer, Stream stream)
         {
-            if (Arguments == null || Arguments.Length == 0)
+            lock (Event)
             {
-                Types = null;
-                Objects = null;
-            }
-            else
-            {
-                Types = new Type[Arguments.Length];
-                Objects = new object[Arguments.Length];
-                for (var i = 0; i < Arguments.Length; i++)
+                if (Arguments == null || Arguments.Length == 0)
                 {
-                    var arg = Arguments[i];
-                    using (var mm = new MemoryStream(arg))
+                    Types = null;
+                    Objects = null;
+                }
+                else
+                {
+                    Types = new Type[Arguments.Length];
+                    Objects = new object[Arguments.Length];
+                    for (var i = 0; i < Arguments.Length; i++)
                     {
-                        Objects[i] = serializer.Deserialize(serializer.SupportedContentType, mm, out Types[i]);
+                        var arg = Arguments[i];
+                        using (var mm = new MemoryStream(arg))
+                        {
+                            Objects[i] = serializer.Deserialize(serializer.SupportedContentType, mm, out Types[i]);
+                        }
                     }
                 }
-            }
 
-            Arguments = null;
+                Arguments = null;
+            }
         }
     }
 }
