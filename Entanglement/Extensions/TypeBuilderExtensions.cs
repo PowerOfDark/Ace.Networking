@@ -49,7 +49,7 @@ namespace Ace.Networking.Entanglement.Extensions
             }
         }
 
-        public static void EmitLdci4(this ILGenerator il, byte i)
+        public static void EmitLdci4(this ILGenerator il, int i)
         {
             switch (i)
             {
@@ -84,6 +84,54 @@ namespace Ace.Networking.Entanglement.Extensions
                     il.Emit(OpCodes.Ldc_I4_S, i);
                     return;
             }
+        }
+
+        public static FieldInfo ImplementEvent(this TypeBuilder b, Type baseType, string name)
+        {
+            var baseEvent = baseType.GetEvent(name, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            var topEvent = b.DefineEvent(name, baseEvent.Attributes, baseEvent.EventHandlerType);
+            var eventField = b.DefineField(name, baseEvent.EventHandlerType, FieldAttributes.Private);
+            var combine = typeof(Delegate).GetMethod("Combine", new[] {typeof(Delegate), typeof(Delegate)});
+
+            var ibaseMethod = baseEvent.GetAddMethod();
+            var addMethod = b.DefineMethod(ibaseMethod.Name,
+                ibaseMethod.Attributes & ~MethodAttributes.Abstract,
+                ibaseMethod.CallingConvention,
+                ibaseMethod.ReturnType,
+                new[] {baseEvent.EventHandlerType });
+
+            var generator = addMethod.GetILGenerator();
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldfld, eventField);
+            generator.Emit(OpCodes.Ldarg_1);
+            generator.Emit(OpCodes.Call, combine);
+            generator.Emit(OpCodes.Castclass, baseEvent.EventHandlerType);
+            generator.Emit(OpCodes.Stfld, eventField);
+            generator.Emit(OpCodes.Ret);
+            topEvent.SetAddOnMethod(addMethod);
+            b.DefineMethodOverride(addMethod, ibaseMethod);
+
+            ibaseMethod = baseEvent.GetRemoveMethod();
+            var removeMethod = b.DefineMethod(ibaseMethod.Name,
+                ibaseMethod.Attributes ^ MethodAttributes.Abstract,
+                ibaseMethod.CallingConvention,
+                ibaseMethod.ReturnType,
+                new[] { baseEvent.EventHandlerType });
+            var remove = typeof(Delegate).GetMethod("Remove", new[] { typeof(Delegate), typeof(Delegate) });
+            generator = removeMethod.GetILGenerator();
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldfld, eventField);
+            generator.Emit(OpCodes.Ldarg_1);
+            generator.Emit(OpCodes.Call, remove);
+            generator.Emit(OpCodes.Castclass, baseEvent.EventHandlerType);
+            generator.Emit(OpCodes.Stfld, eventField);
+            generator.Emit(OpCodes.Ret);
+            topEvent.SetRemoveOnMethod(removeMethod);
+            b.DefineMethodOverride(removeMethod, ibaseMethod);
+            
+            return eventField;
         }
     }
 }

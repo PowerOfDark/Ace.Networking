@@ -301,6 +301,7 @@ namespace Ace.Networking.Threading
         private void WorkMain(ThreadData state)
         {
             //Console.WriteLine("Main thread started");
+            Thread.CurrentThread.Name = "WorkMain";
             var data = state;
             var q = SendQueues[data.Id];
             var handle = data.WaitHandle;

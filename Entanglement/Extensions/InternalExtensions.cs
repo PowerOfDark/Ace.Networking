@@ -13,7 +13,7 @@ namespace Ace.Networking.Entanglement.Extensions
         {
             using (var ms = new MemoryStream(data))
             {
-                return (T)serializer.DeserializeType(typeof(T), ms);
+                return (T)serializer.Deserialize(serializer.SupportedContentType, ms, out var type);
             }
         }
 

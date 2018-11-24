@@ -18,50 +18,115 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 {
     public abstract class EntangledHostedObjectBase : EntangledObjectBase
     {
-        private readonly HashSet<Reflection.PropertyDescriptor> _pendingUpdates = new HashSet<Reflection.PropertyDescriptor>();
+
+        public virtual bool ShouldPushUpdates(InternalPropertyData property)
+        {
+            return true;
+        }
+
+        public class InternalPropertyData
+        {
+            public bool IsPushed { get; set; }
+            public PropertyData Data { get; set; }
+            public Reflection.PropertyDescriptor Descriptor { get; set; }
+
+            public override int GetHashCode()
+            {
+                return Data?.GetHashCode() ?? Descriptor?.GetHashCode() ?? 0;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is InternalPropertyData d && d.Data == this.Data;
+            }
+        }
+
+        private readonly HashSet<InternalPropertyData> _pendingUpdates = new HashSet<InternalPropertyData>();
         protected object _sync = new object();
 
-        public EntangledHostedObjectBase(Guid eid, InterfaceDescriptor i)
+        private readonly Dictionary<string, InternalPropertyData> _cache =
+            new Dictionary<string, InternalPropertyData>();
+
+
+        public EntangledHostedObjectBase(Guid eid, InterfaceDescriptor i, ICommon host)
         {
             _Eid = eid;
             _Descriptor = i;
-            _Context = new EntanglementProviderContext();
+            _Context = new EntanglementProviderContext(host);
+
+            lock (_sync)
+            {
+                foreach (var prop in _Descriptor.Properties)
+                {
+                    var e = _cache[prop.Key] = new InternalPropertyData() {Descriptor = prop.Value, IsPushed = false, Data=new PropertyData(){PropertyName = prop.Key, SerializedData=null}};
+                    UpdateProperty(e, true);
+                }
+
+                
+                foreach (var evkv in _Descriptor.Events)
+                {
+                    var ev = evkv.Value;
+                    if (ev.HandlerDelegate == null)
+                        _Descriptor.AddEventHandlerDelegate(ev, typeof(EntangledHostedObjectBase));
+                    ev.Event.AddEventHandler(this, ev.HandlerDelegate.CreateDelegate(ev.Event.EventHandlerType, this));
+                }
+            }
+
             PropertyChanged += EntangledHostedObjectBase_PropertyChanged;
+        }
+
+        internal void OnEvent(string name, object[] args)
+        {
+            for (int i = 0; i < (args?.Length ?? 0); i++)
+            {
+                if (ReferenceEquals(args[i], this))
+                    args[i] = SelfPlaceholder.Instance;
+            }
+            _Context.All.Send<RaiseEvent>(new RaiseEvent() {Eid = this._Eid, Objects = args, Event = name});
         }
 
         protected EntanglementProviderContext _Context { get; }
 
         private void EntangledHostedObjectBase_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (_Descriptor.Properties.TryGetValue(e.PropertyName, out var prop))
+            if (_cache.TryGetValue(e.PropertyName, out var prop))
             {
                 lock (_sync)
                 {
-                    _pendingUpdates.Add(prop);
+                    lock (prop)
+                    {
+                        if (prop.IsPushed)
+                        {
+                            prop.IsPushed = false;
+                            _pendingUpdates.Add(prop);
+                        }
+                    }
                 }
-
-                PushPropertyUpdates();
+                if(ShouldPushUpdates(prop))
+                    PushPropertyUpdates();
             }
         }
 
         protected UpdateProperties GetAllProperties(IConnection con)
         {
-            var packet = new UpdateProperties {Updates = new List<PropertyData>(), Eid = _Eid};
-            using (var ms = MemoryManager.Instance.GetStream())
+            lock (_sync)
             {
-                foreach (var prop in _Descriptor.Properties)
+                var packet = new UpdateProperties {Updates = new List<PropertyData>(_Descriptor.Properties.Count), Eid = _Eid};
+                foreach (var prop in _cache)
                 {
-                    ms.SetLength(0);
-                    con.Serializer.Serialize(prop.Value.Property.GetValue(this), ms);
-                    packet.Updates.Add(new PropertyData
-                    {
-                        PropertyName = prop.Value.Property.Name,
-                        SerializedData = ms.ToArray()
-                    });
+                    packet.Updates.Add(prop.Value.Data);
                 }
+                return packet;
             }
+        }
 
-            return packet;
+        protected void UpdateProperty(InternalPropertyData d, bool push = false)
+        {
+            lock (d)
+            {
+                d.Data.SerializedData = InternalExtensions.Serialize(d.Descriptor.Property.GetValue(this), this._Context.Host.Serializer);
+                d.IsPushed = push;
+            }
         }
 
         protected void PushPropertyUpdates()
@@ -71,20 +136,13 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             lock (_sync)
             {
                 if (_pendingUpdates.Count == 0 || _Context.All.Clients.Count == 0) return;
-                serializer = _Context.All.Clients.First().Serializer;
+                serializer = _Context.Host.Serializer;
                 packet = new UpdateProperties {Updates = new List<PropertyData>(_pendingUpdates.Count), Eid = _Eid};
-                using (var ms = MemoryManager.Instance.GetStream())
+                foreach (var prop in _pendingUpdates)
                 {
-                    foreach (var prop in _pendingUpdates)
-                    {
-                        ms.SetLength(0);
-                        serializer.Serialize(prop.Property.GetValue(this), ms);
-                        packet.Updates.Add(new PropertyData
-                        {
-                            PropertyName = prop.Property.Name,
-                            SerializedData = ms.ToArray()
-                        });
-                    }
+                    if (prop.IsPushed) continue;
+                    UpdateProperty(prop, true);
+                    packet.Updates.Add(prop.Data);
                 }
 
                 _pendingUpdates.Clear();
@@ -115,21 +173,34 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                 _Context.Sender = req.Connection;
                 RemoteExceptionAdapter exception = null;
                 Task task = null;
+                object retObj = null;
                 try
                 {
-                    var args = new object[overload.Parameters.Length];
-                    for (var i = 0; i < args.Length; i++)
-                        using (var ms = new MemoryStream(cmd.Arguments[i].SerializedData))
-                        {
-                            args[i] = req.Connection.Serializer.DeserializeType(overload.Parameters[i].Type, ms);
-                        }
-
-                    task = (Task) overload.Method.Invoke(this, cmd.Arguments.Length == 0 ? null : args);
+                    retObj = overload.Method.Invoke(this, (cmd.Objects?.Length ?? 0) == 0 ? null : cmd.Objects);
+                    if (overload.IsAsync)
+                        task = (Task) retObj;
                 }
                 catch (Exception e)
                 {
                     exception = new RemoteExceptionAdapter("A remote task failed", e);
                 }
+
+                if (!overload.IsAsync)
+                {
+                    var m = new ExecuteMethodResult()
+                    {
+                        ExceptionAdapter = exception,
+                        SerializedData = null
+                    };
+                    if (overload.RealReturnType != typeof(void) && retObj != null)
+                    {
+                        m.SerializedData = InternalExtensions.Serialize(retObj, req.Connection.Serializer);
+                    }
+
+                    req.SendResponse(m);
+                    return;
+                }
+
 
                 // HUGE HACK WARNING
                 // we need to somehow operate on Task<T>, where T is unknown at compile time
@@ -147,13 +218,11 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                     //else the task is completed
                     else if (overload.RealReturnType == typeof(void))
                     {
-                        res.ExceptionAdapter = null;
                         res.SerializedData = null;
                     }
                     else
                     {
                         res.SerializedData = InternalExtensions.Serialize(((dynamic) task).Result, req.Connection.Serializer);
-                        res.ExceptionAdapter = null;
                     }
 
                     req.SendResponse(res);

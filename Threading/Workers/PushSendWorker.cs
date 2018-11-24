@@ -6,7 +6,8 @@ namespace Ace.Networking.Threading
     {
         public void DoWork(SendMessageQueueItem item)
         {
-            if (item.Target.Connected) item.Target.PushSendSync(item.Task);
+            if (item.Target.Connected)
+                item.Target.PushSendSync(item.Task);
             /* Any exception should be handled by the connection itself,
              * sending to a shut-down connection is the only exception */
         }

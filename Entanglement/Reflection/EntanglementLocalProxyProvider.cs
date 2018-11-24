@@ -61,21 +61,28 @@ namespace Ace.Networking.Entanglement.Reflection
             if (!typeInfo.IsInterface || !typeInfo.IsPublic)
                 throw new ArgumentException("The provided type must be a public interface");
 
+            var elo = typeof(EntangledLocalObjectBase);
+
             var desc = new InterfaceDescriptor(typeof(T));
             var guid = typeInfo.GUID;
             var type = DynamicModule.DefineType($"T{guid.ToString()}", TypeAttributes.Class | TypeAttributes.Public,
-                typeof(EntangledLocalObjectBase));
+                elo);
             type.AddInterfaceImplementation(typeof(T));
 
             var executeMethod =
-                typeof(EntangledLocalObjectBase).GetMethod("ExecuteMethod",
+                elo.GetMethod("ExecuteMethod",
                     BindingFlags.Public | BindingFlags.Instance);
 
             var executeMethodVoid =
-                typeof(EntangledLocalObjectBase).GetMethod("ExecuteMethodVoid",
+                elo.GetMethod("ExecuteMethodVoid",
                     BindingFlags.Public | BindingFlags.Instance);
 
-            type.FillBaseConstructors(typeof(EntangledLocalObjectBase));
+            var executeMethodSync = elo.GetMethod("ExecuteMethodSync", BindingFlags.Public | BindingFlags.Instance);
+            var executeMethodVoidSync =
+                elo.GetMethod("ExecuteMethodVoidSync", BindingFlags.Public | BindingFlags.Instance);
+
+
+            type.FillBaseConstructors(elo);
 
             foreach (var methods in desc.Methods)
             foreach (var method in methods.Value)
@@ -110,11 +117,11 @@ namespace Ace.Networking.Entanglement.Reflection
                         i.Emit(OpCodes.Stelem_Ref);
                     }
                 }
-
+                
                 if (method.RealReturnType == typeof(void))
-                    i.Emit(OpCodes.Call, executeMethodVoid);
+                    i.Emit(OpCodes.Call, method.IsAsync ? executeMethodVoid : executeMethodVoidSync);
                 else
-                    i.Emit(OpCodes.Call, executeMethod.MakeGenericMethod(method.RealReturnType));
+                    i.Emit(OpCodes.Call, (method.IsAsync ? executeMethod : executeMethodSync).MakeGenericMethod(method.RealReturnType));
 
                 i.Emit(OpCodes.Ret);
 
@@ -155,10 +162,21 @@ namespace Ace.Networking.Entanglement.Reflection
                 generatedProperties.Enqueue(propItem.Key);
             }
 
+            foreach (var ev in desc.Events)
+            {
+                type.ImplementEvent(typeInfo, ev.Key);
+            }
+
 
             var result =
                 new EntangledTypeProxyDescriptor {GeneratedType = type.CreateTypeInfo().AsType(), Interface = desc};
 
+            foreach (var ev in desc.Events)
+            {
+                ev.Value.BackingField =
+                    result.GeneratedType.GetField(ev.Key, BindingFlags.NonPublic | BindingFlags.Instance);
+                ev.Value.InvokerDelegate = CreateEventInvokerDelegate(type, ev.Value, typeInfo);
+            }
             while (generatedProperties.Any())
             {
                 var prop = generatedProperties.Dequeue();
@@ -167,6 +185,43 @@ namespace Ace.Networking.Entanglement.Reflection
             }
 
             return result;
+        }
+
+        private static Action<object, object[]> CreateEventInvokerDelegate(TypeBuilder b, EventDescriptor ev, Type target)
+        {
+            var args = ev.InvokeMethod.GetParameters();
+            var dm = new DynamicMethod($"I{ev.InvokeMethod.Name}", ev.InvokeMethod.ReturnType == typeof(void) ? null : typeof(object), DelegateHelper.DelegateParameters, DynamicModule, true);
+            var il = dm.GetILGenerator();
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Castclass, target);
+            il.Emit(OpCodes.Ldfld, ev.BackingField);
+            il.Emit(OpCodes.Dup);
+            var mRet = il.DefineLabel();
+            var mOk = il.DefineLabel();
+
+            il.Emit(OpCodes.Brtrue_S, mOk);
+            il.Emit(OpCodes.Pop);
+            il.Emit(OpCodes.Br_S, mRet);
+            il.MarkLabel(mOk);
+
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                il.Emit(OpCodes.Ldarg_1);
+                il.EmitLdci4(i);
+                il.Emit(OpCodes.Ldelem_Ref);
+                var pt = args[i].ParameterType;
+                if (pt.GetTypeInfo().IsValueType)
+                {
+                    il.Emit(OpCodes.Unbox_Any, pt);
+                }
+                else il.Emit(OpCodes.Castclass, pt);
+            }
+            il.Emit(OpCodes.Call, ev.InvokeMethod);
+            il.MarkLabel(mRet);
+            il.Emit(OpCodes.Ret);
+            return (Action<object,object[]>)dm.CreateDelegate(typeof(Action<object, object[]>));
         }
     }
 }

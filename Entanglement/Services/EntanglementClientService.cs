@@ -28,6 +28,7 @@ namespace Ace.Networking.Entanglement
             _connection = server;
 
             server.On<UpdateProperties>(OnUpdateProperties);
+            server.On<RaiseEvent>(OnRaiseEvent);
         }
 
         public void Detach(IConnection server)
@@ -35,6 +36,7 @@ namespace Ace.Networking.Entanglement
             if (server == null || !server.Equals(_connection)) return;
 
             server.Off<UpdateProperties>(OnUpdateProperties);
+            server.Off<RaiseEvent>(OnRaiseEvent);
             LocalInstances.Clear();
             _connection = null;
         }
@@ -51,7 +53,7 @@ namespace Ace.Networking.Entanglement
                 return (T) (object) instance;
 
             var q = new EntangleRequest {Eid = eid, InterfaceId = interfaceId};
-            var result = await _connection.SendRequest<EntangleRequest, EntangleResult>(q);
+            var result = await _connection.SendRequest<EntangleRequest, EntangleResult>(q).ConfigureAwait(false);
             if (result?.Eid == null) return null;
 
             instance = GetExistingInstance<T>(result.Eid);
@@ -60,8 +62,8 @@ namespace Ace.Networking.Entanglement
             instance = EntanglementLocalProxyProvider.Get<T>(_connection, result.Eid.Value);
             LocalInstances.TryAdd(result.Eid.Value, instance);
 
-            var test = await _connection.SendRequest<UpdateRequest, UpdateProperties>(new UpdateRequest() {Eid = result.Eid.Value});
-
+            var props = await _connection.SendRequest<UpdateRequest, UpdateProperties>(new UpdateRequest() {Eid = result.Eid.Value}).ConfigureAwait(false);
+            OnUpdateProperties(_connection, props);
             return (T) (object) instance;
         }
 
@@ -80,5 +82,15 @@ namespace Ace.Networking.Entanglement
                 instance.UpdateProperties(connection, payload);
             return null;
         }
+
+
+        private object OnRaiseEvent(IConnection connection, RaiseEvent payload)
+        {
+            if (payload != null && LocalInstances.TryGetValue(payload.Eid, out var instance))
+                instance.RaiseEvent(connection, payload);
+            return null;
+        }
+
+
     }
 }

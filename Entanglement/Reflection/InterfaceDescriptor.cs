@@ -3,8 +3,11 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Threading.Tasks;
+using Ace.Networking.Entanglement.Extensions;
 using Ace.Networking.Entanglement.Packets;
+using Ace.Networking.Entanglement.ProxyImpl;
 
 namespace Ace.Networking.Entanglement.Reflection
 {
@@ -19,6 +22,19 @@ namespace Ace.Networking.Entanglement.Reflection
         public MethodInfo Method;
         public ParameterDescriptor[] Parameters;
         public Type RealReturnType;
+        public bool IsAsync;
+    }
+
+    public class EventDescriptor
+    {
+        public FieldInfo BackingField;
+        public EventInfo Event;
+        public ParameterDescriptor[] Parameters;
+        public MethodInfo InvokeMethod;
+
+        public DynamicMethod HandlerDelegate;
+        public Action<object, object[]> InvokerDelegate;
+        
     }
 
     public class PropertyDescriptor : IEqualityComparer<PropertyDescriptor>
@@ -48,6 +64,8 @@ namespace Ace.Networking.Entanglement.Reflection
         private readonly Dictionary<string, PropertyDescriptor> _properties =
             new Dictionary<string, PropertyDescriptor>();
 
+        private readonly Dictionary<string, EventDescriptor> _events = new Dictionary<string, EventDescriptor>();
+
         public InterfaceDescriptor(Type t, bool onlyVirtualProperties = false)
         {
             Type = t;
@@ -58,6 +76,7 @@ namespace Ace.Networking.Entanglement.Reflection
 
         public IReadOnlyDictionary<string, PropertyDescriptor> Properties => _properties;
         public IReadOnlyDictionary<string, IReadOnlyCollection<MethodDescriptor>> Methods => _methods;
+        public IReadOnlyDictionary<string, EventDescriptor> Events => _events;
 
         public static InterfaceDescriptor Get(Type type)
         {
@@ -73,6 +92,7 @@ namespace Ace.Networking.Entanglement.Reflection
 
             FillProperties(t, onlyVirtualProperties);
             FillMethods(t);
+            FillEvents(t);
         }
 
         private void FillProperties(Type t, bool onlyVirtual = false)
@@ -137,13 +157,14 @@ namespace Ace.Networking.Entanglement.Reflection
             {
                 if (m.IsGenericMethod || m.IsSpecialName || m.GetCustomAttribute<IgnoredAttribute>() != null) return;
                 var realRet = UnwrapTask(m.ReturnType);
-                if (realRet == null)
+
+                /*if (realRet == null)
                 {
                     if (isInterface)
                         throw new InvalidCastException(
                             "The entangled interface methods need to return either Task or Task<T>.");
                     return;
-                }
+                }*/
 
                 LinkedList<MethodDescriptor> list;
 
@@ -159,7 +180,8 @@ namespace Ace.Networking.Entanglement.Reflection
                     Parameters =
                         m.GetParameters().Select(p =>
                             new ParameterDescriptor {IsOptional = p.IsOptional, Type = p.ParameterType}).ToArray(),
-                    RealReturnType = realRet
+                    RealReturnType = realRet ?? m.ReturnType,
+                    IsAsync = realRet != null,
                 });
             }
 
@@ -186,6 +208,84 @@ namespace Ace.Networking.Entanglement.Reflection
 
             var methods = t.GetMethods(flags);
             foreach (var method in methods) fillMethod(method);
+        }
+
+        private void FillEvents(Type t)
+        {
+            var events = t.GetEvents();
+
+            foreach(var ev in events)
+            {
+                if (ev.GetCustomAttribute<IgnoredAttribute>() != null) continue;
+                EventDescriptor desc;
+                _events.Add(ev.Name, desc = new EventDescriptor()
+                {
+                    Event = ev,
+                    InvokeMethod = ev.EventHandlerType?.GetMethod("Invoke"),
+                });
+                desc.Parameters = desc.InvokeMethod?.GetParameters().Select(p =>
+                    new ParameterDescriptor() {IsOptional = p.IsOptional, Type = p.ParameterType}).ToArray();
+            }
+
+        }
+
+        public int Test(EntangledHostedObjectBase ba, int a, string b, DateTime c)
+        {
+            ba.OnEvent("shit", new object[] {a, b, c,});
+            return 5 + 7;
+        }
+
+        public int DoSth(object obj, object[] args)
+        {
+            return ((InterfaceDescriptor) obj).Test((EntangledHostedObjectBase)args[0], (int)args[1], (string)args[2], (DateTime)args[3]);
+        }
+
+
+        public void AddEventInvokerDelegate(EventDescriptor ev)
+        {
+            ev.InvokerDelegate = DelegateHelper.ConstructDelegateCallVoid(ev.InvokeMethod, ev.Event.EventHandlerType);
+        }
+
+        public void AddEventHandlerDelegate(EventDescriptor ev, Type handler)
+
+        {
+            Type[] args = new Type[ev.Parameters.Length + 1];
+            args[0] = handler;
+            for (int i = 0; i < ev.Parameters.Length; i++) args[i + 1] = ev.Parameters[i].Type;
+            var m = new DynamicMethod($"H{ev.Event.Name}", typeof(void), args, handler, true);
+            var il = m.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldstr, ev.Event.Name);
+
+
+            if ((ev.Parameters?.Length ?? 0) == 0)
+            {
+                il.Emit(OpCodes.Ldnull);
+            }
+            else
+            {
+                il.EmitLdci4((byte)ev.Parameters.Length);
+                il.Emit(OpCodes.Newarr, typeof(object));
+                for (byte l = 0; l < ev.Parameters.Length; l++)
+                {
+                    il.Emit(OpCodes.Dup);
+                    il.EmitLdci4(l);
+                    il.EmitLdarg((byte)(l + 1));
+                    if (ev.Parameters[l].Type.GetTypeInfo().IsValueType)
+                        il.Emit(OpCodes.Box, ev.Parameters[l].Type);
+
+                    il.Emit(OpCodes.Stelem_Ref);
+                }
+            }
+
+
+
+            il.Emit(OpCodes.Call, handler.GetMethod("OnEvent", BindingFlags.Instance | BindingFlags.NonPublic));
+            il.Emit(OpCodes.Ret);
+            //var d = m.CreateDelegate(ev.Event.EventHandlerType);
+            ev.HandlerDelegate = m;
+            //il.EmitCall(OpCodes.Call, handler.GetMethod("OnEvent"), )
+
         }
 
         public MethodDescriptor FindOverload(ExecuteMethod cmd)

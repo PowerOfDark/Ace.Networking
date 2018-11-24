@@ -20,6 +20,11 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             Host = host;
             _Eid = eid;
             _Descriptor = desc;
+            foreach (var evkv in _Descriptor.Events)
+            {
+                var ev = evkv.Value;
+                if (ev.InvokerDelegate == null) _Descriptor.AddEventInvokerDelegate(ev);
+            }
         }
 
         public IConnection Host { get; internal set; }
@@ -55,17 +60,27 @@ namespace Ace.Networking.Entanglement.ProxyImpl
         public async Task<T> ExecuteMethod<T>(string name, params object[] arg)
         {
             var desc = GetExecuteMethodDescriptor(name, typeof(T), arg);
-            var res = await Host.SendRequest<ExecuteMethod, ExecuteMethodResult>(desc);
+            var res = await Host.SendRequest<ExecuteMethod, ExecuteMethodResult>(desc).ConfigureAwait(false);
             if (res.ExceptionAdapter != null)
                 throw new RemoteException(res.ExceptionAdapter);
             if (res.SerializedData == null || res.SerializedData.Length == 0) return default;
             return res.SerializedData.Deserialize<T>(this.Host.Serializer);
         }
 
+        public T ExecuteMethodSync<T>(string name, params object[] arg)
+        {
+            return ExecuteMethod<T>(name, arg).GetAwaiter().GetResult();
+        }
+
+        public void ExecuteMethodVoidSync(string name, params object[] arg)
+        {
+            ExecuteMethodVoid(name, arg).GetAwaiter().GetResult();
+        }
+
         public async Task ExecuteMethodVoid(string name, params object[] arg)
         {
             var desc = GetExecuteMethodDescriptor(name, typeof(void), arg);
-            var res = await Host.SendRequest<ExecuteMethod, ExecuteMethodResult>(desc);
+            var res = await Host.SendRequest<ExecuteMethod, ExecuteMethodResult>(desc).ConfigureAwait(false);
             if (res.ExceptionAdapter != null)
                 throw new RemoteException(res.ExceptionAdapter);
         }
@@ -88,10 +103,21 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             foreach (var update in updates.Updates) OnPropertyChanged(update.PropertyName);
         }
 
-        private object updateProperties(IConnection host, UpdateProperties updates)
+        public event EventHandler sit;
+
+
+        public void RaiseEvent(IConnection host, RaiseEvent data)
         {
-            UpdateProperties(host, updates);
-            return null;
+            if (_Descriptor.Events.TryGetValue(data.Event, out var ev))
+            {
+                for (int i = 0; i < (data?.Objects?.Length); i++)
+                {
+                    if (data.Types[i] == typeof(SelfPlaceholder))
+                        data.Objects[i] = this;
+                }
+                //todo optimize property lookup
+                ev.InvokerDelegate.Invoke(this, data.Objects);
+            }
         }
     }
 }

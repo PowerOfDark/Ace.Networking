@@ -11,6 +11,7 @@ using Ace.Networking.Entanglement.Structures;
 using Ace.Networking.Handlers;
 using Ace.Networking.Interfaces;
 using Ace.Networking.MicroProtocol.Interfaces;
+using Ace.Networking.Services;
 
 namespace Ace.Networking.Entanglement
 {
@@ -24,7 +25,7 @@ namespace Ace.Networking.Entanglement
 
         protected HashSet<Guid /*Eid*/> ManualMap = new HashSet<Guid>();
 
-        protected ConcurrentDictionary<Guid /*Eid*/, EntangledHostedObjectBase> Objects =
+        public ConcurrentDictionary<Guid /*Eid*/, EntangledHostedObjectBase> Objects =
             new ConcurrentDictionary<Guid, EntangledHostedObjectBase>();
 
         protected ConcurrentDictionary<IConnection, ConcurrentDictionary<Guid /*InterfaceId*/, Guid /*Eid*/>>
@@ -39,7 +40,7 @@ namespace Ace.Networking.Entanglement
 
         public bool IsActive => BoundInterfaces.Count > 0;
 
-        public void Attach(ICommon server)
+        void IService<ICommon>.Attach(ICommon server)
         {
             if (BoundInterfaces.Contains(server)) return;
             if (BoundInterfaces.Any())
@@ -57,7 +58,7 @@ namespace Ace.Networking.Entanglement
             server.OnRequest<UpdateRequest>(OnRequestUpdate);
         }
 
-        public void Detach(ICommon server)
+        void IService<ICommon>.Detach(ICommon server)
         {
             if (!BoundInterfaces.Remove(server)) return;
 
@@ -66,6 +67,7 @@ namespace Ace.Networking.Entanglement
             server.OffRequest<ExecuteMethod>(OnRequestExecuteMethodResult);
             server.OffRequest<EntangleRequest>(OnRequestEntangle);
             server.OffRequest<UpdateRequest>(OnRequestUpdate);
+
         }
 
 
@@ -116,10 +118,14 @@ namespace Ace.Networking.Entanglement
                     InterfaceId = guid,
                     InterfaceDescriptor = InterfaceDescriptor.Get(baseType)
                 }))
+            {
                 Interfaces[guid].Access = access;
-            if (Host?.TypeResolver != null)
-                RegisterTypes(Host.TypeResolver, e);
-
+            }
+            else
+            {
+                if (Host?.TypeResolver != null)
+                    RegisterTypes(Host.TypeResolver, e);
+            }
         }
 
         public IEntanglementHostService Register<TBase, T>(EntanglementAccess access)

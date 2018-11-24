@@ -242,7 +242,7 @@ namespace Ace.Networking
         public async Task<TResponse> SendRequest<TRequest, TResponse>(TRequest req,
             CancellationToken? token = null)
         {
-            var res = await SendRequest(req, token);
+            var res = await SendRequest(req, token).ConfigureAwait(false);
             return (TResponse) res;
         }
 
@@ -530,7 +530,7 @@ namespace Ace.Networking
 
         private async Task ReadAsync()
         {
-            await _receiveLock.WaitAsync();
+            await _receiveLock.WaitAsync().ConfigureAwait(false);
             while (_receiveWorkerThreadRunning)
                 try
                 {
@@ -628,7 +628,7 @@ namespace Ace.Networking
         internal Task EnqueueSendPacket(IPreparedPacket packet)
         {
             if (!Connected) throw new InvalidOperationException("The socket had been closed");
-            var tcs = new TaskCompletionSource<object>(packet);
+            var tcs = new TaskCompletionSource<object>(packet, TaskCreationOptions.RunContinuationsAsynchronously);
             if (UseCustomOutcomingMessageQueue)
             {
                 CustomOutcomingMessageQueue.Enqueue(new SendMessageQueueItem(this, tcs), GetHashCode());
@@ -669,7 +669,7 @@ namespace Ace.Networking
         /// <returns></returns>
         public Task<object> Receive(PayloadFilter filter, CancellationToken? token = null)
         {
-            var tcs = new TaskCompletionSource<object>(filter);
+            var tcs = new TaskCompletionSource<object>(filter, TaskCreationOptions.RunContinuationsAsynchronously);
 
             lock (_receiveFiltersLock)
             {
@@ -683,12 +683,12 @@ namespace Ace.Networking
 
         public async Task<T> Receive<T>(CancellationToken? token = null)
         {
-            var tcs = new TaskCompletionSource<object>();
+            var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             if (!_receiveTypeFilters.TryAddLast(typeof(T), tcs)) throw new InvalidOperationException();
 
             token?.Register(t => ((TaskCompletionSource<object>) t).TrySetCanceled(), tcs);
 
-            return (T) await tcs.Task;
+            return (T) await tcs.Task.ConfigureAwait(false);
         }
 
 
@@ -711,7 +711,7 @@ namespace Ace.Networking
         public Task<object> SendRequest<TRequest>(TRequest req, CancellationToken? token = null)
         {
             var id = Interlocked.Increment(ref _lastRequestId);
-            var tcs = new TaskCompletionSource<object>(id);
+            var tcs = new TaskCompletionSource<object>(id, TaskCreationOptions.RunContinuationsAsynchronously);
 
             if (!_responseHandlers.TryAdd(id, tcs)) throw new InvalidOperationException();
 
@@ -729,7 +729,7 @@ namespace Ace.Networking
 
         public Task<RequestWrapper> ReceiveRequest(Type type, CancellationToken? token = null)
         {
-            var tcs = new TaskCompletionSource<RequestWrapper>();
+            var tcs = new TaskCompletionSource<RequestWrapper>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             if (!_requestHandlers.TryEnqueue(type, tcs)) throw new InvalidOperationException();
 
