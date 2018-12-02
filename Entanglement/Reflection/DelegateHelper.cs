@@ -11,10 +11,11 @@ namespace Ace.Networking.Entanglement.Reflection
     {
         public static readonly Type[] DelegateParameters = {typeof(object), typeof(object[])};
 
-        public static Delegate ConstructDelegateCall(MethodInfo method, Type target)
+        public static Delegate ConstructDelegateCall(MethodInfo method, Type target, bool stubReturn = false)
         {
             var args = method.GetParameters();
-            var dm = new DynamicMethod($"D{method.Name}", method.ReturnType == typeof(void) ? null : typeof(object), DelegateParameters, true);
+            bool retVoid = method.ReturnType == typeof(void) && !stubReturn;
+            var dm = new DynamicMethod($"D{method.Name}", retVoid ? null : typeof(object), DelegateParameters, DynamicAssembly.DynamicModule);
             var il = dm.GetILGenerator();
 
             il.Emit(OpCodes.Ldarg_0);
@@ -34,9 +35,11 @@ namespace Ace.Networking.Entanglement.Reflection
             }
 
             il.Emit(OpCodes.Callvirt, method);
+            if (!retVoid && method.ReturnType == typeof(void))
+                il.Emit(OpCodes.Ldnull);
             il.Emit(OpCodes.Ret);
 
-            var funcType = method.ReturnType == typeof(void)
+            var funcType = retVoid
                 ? typeof(Action<object, object[]>)
                 : typeof(Func<object, object[], object>);
 
@@ -50,7 +53,7 @@ namespace Ace.Networking.Entanglement.Reflection
 
         public static Func<object, object[], object> ConstructDelegateCallFunc(MethodInfo method, Type target)
         {
-            return (Func<object, object[], object>) ConstructDelegateCall(method, target);
+            return (Func<object, object[], object>) ConstructDelegateCall(method, target, true);
         }
 
     }

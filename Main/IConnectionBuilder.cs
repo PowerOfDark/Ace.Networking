@@ -14,7 +14,7 @@ namespace Ace.Networking
         IConnectionBuilder UseServices<TBuilder>(Func<TBuilder, IServicesBuilder<IConnection>> config)
             where TBuilder : IServicesBuilder<IConnection>;
 
-        IConnectionBuilder UseServices(Func<IServicesBuilder<IConnection>, IServicesBuilder<IConnection>> config);
+        //IConnectionBuilder UseServices(Func<IServicesBuilder<IConnection>, IServicesBuilder<IConnection>> config);
 
         IConnectionBuilder UseSsl(ISslStreamFactory factory);
         IConnectionBuilder UseData(IConnectionData data);

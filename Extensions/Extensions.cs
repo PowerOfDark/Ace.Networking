@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace Ace.Networking
+namespace Ace.Networking.Extensions
 {
     public static class Extensions
     {

@@ -13,31 +13,8 @@ namespace Ace.Networking.Entanglement.Reflection
 {
     public class EntanglementLocalProxyProvider
     {
-        private static readonly object _sync = new object();
-        private static ModuleBuilder _dynamicModule;
-
-
         public static ConcurrentDictionary<Guid, EntangledTypeProxyDescriptor> GeneratedTypes =
             new ConcurrentDictionary<Guid, EntangledTypeProxyDescriptor>();
-
-        public static ModuleBuilder DynamicModule
-        {
-            get
-            {
-                lock (_sync)
-                {
-                    if (_dynamicModule == null)
-                    {
-                        var assembly = AssemblyBuilder.DefineDynamicAssembly(
-                            new AssemblyName($"{nameof(EntanglementLocalProxyProvider)}"),
-                            AssemblyBuilderAccess.RunAndCollect);
-                        _dynamicModule = assembly.DefineDynamicModule(Guid.NewGuid().ToString());
-                    }
-                }
-
-                return _dynamicModule;
-            }
-        }
 
         public static EntangledLocalObjectBase Get<T>(IConnection host, Guid eid) where T : class/*, IEntangledObject*/
         {
@@ -65,7 +42,7 @@ namespace Ace.Networking.Entanglement.Reflection
 
             var desc = new InterfaceDescriptor(typeof(T));
             var guid = typeInfo.GUID;
-            var type = DynamicModule.DefineType($"T{guid.ToString()}", TypeAttributes.Class | TypeAttributes.Public,
+            var type = DynamicAssembly.DynamicModule.DefineType($"T{guid.ToString()}", TypeAttributes.Class | TypeAttributes.Public,
                 elo);
             type.AddInterfaceImplementation(typeof(T));
 
@@ -190,7 +167,7 @@ namespace Ace.Networking.Entanglement.Reflection
         private static Action<object, object[]> CreateEventInvokerDelegate(TypeBuilder b, EventDescriptor ev, Type target)
         {
             var args = ev.InvokeMethod.GetParameters();
-            var dm = new DynamicMethod($"I{ev.InvokeMethod.Name}", ev.InvokeMethod.ReturnType == typeof(void) ? null : typeof(object), DelegateHelper.DelegateParameters, DynamicModule, true);
+            var dm = new DynamicMethod($"I{ev.InvokeMethod.Name}", ev.InvokeMethod.ReturnType == typeof(void) ? null : typeof(object), DelegateHelper.DelegateParameters, DynamicAssembly.DynamicModule, true);
             var il = dm.GetILGenerator();
 
             il.Emit(OpCodes.Ldarg_0);

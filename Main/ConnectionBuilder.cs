@@ -34,10 +34,6 @@ namespace Ace.Networking
             return this;
         }
 
-        public IConnectionBuilder UseServices(Func<IServicesBuilder<IConnection>, IServicesBuilder<IConnection>> config)
-        {
-            return UseServices<ServicesBuilder<IConnection>>(config);
-        }
 
         public IConnectionBuilder UseData(IConnectionData data)
         {

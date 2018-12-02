@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System;
+using System.Reflection;
 using System.Reflection.Emit;
 
 namespace Ace.Networking.Entanglement.Reflection
@@ -22,6 +23,26 @@ namespace Ace.Networking.Entanglement.Reflection
                 }
 
                 return _assembly;
+            }
+        }
+
+
+        private static ModuleBuilder _dynamicModule;
+
+        public static ModuleBuilder DynamicModule
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    if (_dynamicModule == null)
+                    {
+                        var assembly = Assembly;
+                        _dynamicModule = assembly.DefineDynamicModule(Guid.NewGuid().ToString());
+                    }
+                }
+
+                return _dynamicModule;
             }
         }
     }

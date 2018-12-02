@@ -70,6 +70,15 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                         _Descriptor.AddEventHandlerDelegate(ev, typeof(EntangledHostedObjectBase));
                     ev.Event.AddEventHandler(this, ev.HandlerDelegate.CreateDelegate(ev.Event.EventHandlerType, this));
                 }
+
+                foreach (var ml in _Descriptor.Methods)
+                {
+                    foreach (var method in ml.Value)
+                    {
+                        if (method.InvokerDelegate == null)
+                            _Descriptor.AddMethodDelegate(method);
+                    }
+                }
             }
 
             PropertyChanged += EntangledHostedObjectBase_PropertyChanged;
@@ -176,7 +185,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                 object retObj = null;
                 try
                 {
-                    retObj = overload.Method.Invoke(this, (cmd.Objects?.Length ?? 0) == 0 ? null : cmd.Objects);
+                    retObj = overload.InvokerDelegate.Invoke(this, (cmd.Objects?.Length ?? 0) == 0 ? null : cmd.Objects);
                     if (overload.IsAsync)
                         task = (Task) retObj;
                 }

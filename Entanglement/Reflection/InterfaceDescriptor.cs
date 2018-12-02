@@ -23,6 +23,9 @@ namespace Ace.Networking.Entanglement.Reflection
         public ParameterDescriptor[] Parameters;
         public Type RealReturnType;
         public bool IsAsync;
+
+        public Func<object, object[], object> InvokerDelegate;
+
     }
 
     public class EventDescriptor
@@ -252,7 +255,7 @@ namespace Ace.Networking.Entanglement.Reflection
             Type[] args = new Type[ev.Parameters.Length + 1];
             args[0] = handler;
             for (int i = 0; i < ev.Parameters.Length; i++) args[i + 1] = ev.Parameters[i].Type;
-            var m = new DynamicMethod($"H{ev.Event.Name}", typeof(void), args, handler, true);
+            var m = new DynamicMethod($"H{ev.Event.Name}", typeof(void), args, DynamicAssembly.DynamicModule, true);
             var il = m.GetILGenerator();
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldstr, ev.Event.Name);
@@ -286,6 +289,11 @@ namespace Ace.Networking.Entanglement.Reflection
             ev.HandlerDelegate = m;
             //il.EmitCall(OpCodes.Call, handler.GetMethod("OnEvent"), )
 
+        }
+
+        public void AddMethodDelegate(MethodDescriptor method)
+        {
+            method.InvokerDelegate = DelegateHelper.ConstructDelegateCallFunc(method.Method, this.Type);
         }
 
         public MethodDescriptor FindOverload(ExecuteMethod cmd)

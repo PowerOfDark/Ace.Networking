@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Ace.Networking.Extensions;
 using Ace.Networking.Interfaces;
 using Ace.Networking.MicroProtocol.Interfaces;
 
