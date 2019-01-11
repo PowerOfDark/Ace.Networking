@@ -30,6 +30,7 @@ namespace Ace.Networking.Threading
         protected long LastStepdownTick;
 
         protected int LastTickQueueSize = 0;
+        protected int LastBoostSize = 0;
         protected long LastWorkTicks;
         protected long MonitorTick;
         protected ConcurrentQueue<ThreadedQueueItem<TItem>>[] SendQueues;
@@ -72,6 +73,7 @@ namespace Ace.Networking.Threading
                 SendQueues[i] = new ConcurrentQueue<ThreadedQueueItem<TItem>>();
                 ThreadList.Add(null);
             }
+            TrySpawnNewThreads(Parameters.MinThreads);
 
             if (Parameters.MaxThreads == Parameters.MinThreads)
             {
@@ -79,11 +81,8 @@ namespace Ace.Networking.Threading
             }
             else
             {
-                _timer = new Timer(Monitor, null, 1000, Timeout.Infinite);
+                _timer = new Timer(Monitor, null, 0, Timeout.Infinite);
             }
-
-
-            SpawnNewThreads(Parameters.MinThreads);
         }
 
         public void NewClient()
@@ -92,12 +91,13 @@ namespace Ace.Networking.Threading
             Interlocked.Increment(ref ClientCount);
         }
 
+        [Obsolete]
         public void Stop()
         {
             _timer?.Dispose();
             var tmp = ThreadList.ToList();
             ThreadList.Clear(); // crash every enqueue attempt
-            while (_pending != 0) Thread.Sleep(2);
+            while (_pending != 0) Thread.Sleep(1);
             for (var i = 0; i < ThreadCount; i++)
             {
                 tmp[i].Run = false;
@@ -129,7 +129,7 @@ namespace Ace.Networking.Threading
             if (cc >= BoostPeak + Parameters.BoostBarrier &&
                 MonitorTick - LastBoostTick >= Parameters.BoostCooldownTicks)
             {
-                target += 1;
+                target += (LastBoostSize+=1);
                 BoostPeak = cc - Parameters.BoostBarrier;
             }
 
@@ -172,6 +172,7 @@ namespace Ace.Networking.Threading
             {
                 if (currentThreadCount > threadsRequired)
                 {
+                    LastBoostSize = 0;
                     if (MonitorTick - LastKillTick >= Parameters.ThreadKillCooldownTicks)
                     {
                         var leastWork = long.MaxValue;
@@ -234,7 +235,7 @@ namespace Ace.Networking.Threading
             }
 
             Interlocked.Increment(ref MonitorTick);
-            _timer.Change(1000 / Parameters.MonitorTickrate, Timeout.Infinite);
+            _timer.Change(1000 / ThreadedQueueProcessorParameters.MonitorTickrate, Timeout.Infinite);
         }
 
         private void KillThread(int id, int count)

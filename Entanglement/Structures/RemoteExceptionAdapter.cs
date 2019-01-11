@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using MessagePack;
+
 using ProtoBuf;
 
 namespace Ace.Networking.Entanglement.Structures
 {
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
     [Guid("BC3274A7-D456-41A4-AC04-AA6E03C303E3")]
-    [MessagePackObject]
     public class RemoteExceptionAdapter
     {
         public RemoteExceptionAdapter()
@@ -30,6 +29,6 @@ namespace Ace.Networking.Entanglement.Structures
             }
         }
 
-        [Key(0)] public string Message { get; protected set; }
+        public string Message { get; protected set; }
     }
 }
