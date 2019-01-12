@@ -10,6 +10,7 @@ namespace Ace.Networking.MicroProtocol.Enums
         None = 0,
         NoContent = 1,
         IsRequest = 2,
-        IsResponse = 4
+        IsResponse = 4,
+        MultiContent = 8,
     }
 }

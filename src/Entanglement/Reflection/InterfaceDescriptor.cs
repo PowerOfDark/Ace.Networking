@@ -299,17 +299,20 @@ namespace Ace.Networking.Entanglement.Reflection
         public MethodDescriptor FindOverload(ExecuteMethod cmd)
         {
             foreach (var m in _methods[cmd.Method])
-                if (cmd._ReturnType.IsAssignableFrom(m.RealReturnType) &&
-                    m.Parameters.Length == (cmd.Types?.Length ?? 0))
+                if (/*cmd._ReturnType.IsAssignableFrom(m.RealReturnType) &&*/
+                    m.Parameters.Length == (cmd.Objects?.Length ?? 0))
                 {
                     var i = 0;
                     var err = false;
-                    for (; i < m.Parameters.Length && i < cmd.Types?.Length; i++)
-                        if (!m.Parameters[i].Type.IsAssignableFrom(cmd.Types[i]))
+                    for (; i < m.Parameters.Length && i < cmd.Objects?.Length; i++)
+                    {
+                        var type = cmd.Objects[i]?.GetType();
+                        if (type != null && !m.Parameters[i].Type.IsAssignableFrom(type))
                         {
                             err = true;
                             break;
                         }
+                    }
 
                     if (err) continue;
                     return m;

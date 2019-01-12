@@ -199,11 +199,11 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                     var m = new ExecuteMethodResult()
                     {
                         ExceptionAdapter = exception,
-                        SerializedData = null
+                        Data = null
                     };
                     if (overload.RealReturnType != typeof(void) && retObj != null)
                     {
-                        m.SerializedData = InternalExtensions.Serialize(retObj, req.Connection.Serializer);
+                        m.Data = retObj;
                     }
 
                     req.SendResponse(m);
@@ -219,7 +219,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                     var res = new ExecuteMethodResult();
                     if (exception != null || task.IsFaulted)
                     {
-                        res.SerializedData = null;
+                        res.Data = null;
                         res.ExceptionAdapter =
                             exception ?? new RemoteExceptionAdapter("A remote task failed", task.Exception);
                     }
@@ -227,11 +227,11 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                     //else the task is completed
                     else if (overload.RealReturnType == typeof(void))
                     {
-                        res.SerializedData = null;
+                        res.Data = null;
                     }
                     else
                     {
-                        res.SerializedData = InternalExtensions.Serialize(((dynamic) task).Result, req.Connection.Serializer);
+                        res.Data = ((dynamic)task).Result;
                     }
 
                     req.SendResponse(res);
@@ -243,7 +243,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                     {
                         RemoteExceptionAdapter ex = null;
                         if (t.Exception != null) ex = new RemoteExceptionAdapter("A remote task failed", t.Exception);
-                        req.SendResponse(new ExecuteMethodResult {SerializedData = null, ExceptionAdapter = ex});
+                        req.SendResponse(new ExecuteMethodResult {Data = null, ExceptionAdapter = ex});
                     });
                 else
                     task.ContinueWith(t =>
@@ -251,13 +251,13 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                         var exe = new ExecuteMethodResult();
                         if (t.Exception != null)
                         {
-                            exe.SerializedData = null;
+                            exe.Data = null;
                             exe.ExceptionAdapter = new RemoteExceptionAdapter("A remote task failed", t.Exception);
                         }
                         else
                         {
                             exe.ExceptionAdapter = null;
-                            exe.SerializedData = InternalExtensions.Serialize(((dynamic)task).Result, req.Connection.Serializer);
+                            exe.Data = ((dynamic)task).Result;
                         }
 
                         req.SendResponse(exe);

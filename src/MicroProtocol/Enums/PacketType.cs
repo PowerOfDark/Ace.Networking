@@ -9,6 +9,5 @@ namespace Ace.Networking.MicroProtocol.Enums
         ContentPacket,
         RawData,
         Trackable,
-        MultiContentPacket,
     }
 }

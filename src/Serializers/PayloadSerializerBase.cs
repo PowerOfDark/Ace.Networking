@@ -47,7 +47,16 @@ namespace Ace.Networking.Serializers
 
         public virtual bool IsValidContentType(byte[] contentType)
         {
-            return contentType == SupportedContentType || Enumerable.SequenceEqual(SupportedContentType, contentType);
+            return contentType == SupportedContentType || SequenceEqual(SupportedContentType, contentType);
+        }
+
+        private bool SequenceEqual(byte[] supportedContentType, byte[] contentType)
+        {
+            if (supportedContentType.Length != contentType.Length) return false;
+            for (int i = 0; i < supportedContentType.Length; i++)
+                if (SupportedContentType[i] != contentType[i])
+                    return false;
+            return true;
         }
     }
 }

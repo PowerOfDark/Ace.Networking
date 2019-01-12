@@ -11,6 +11,6 @@ namespace Ace.Networking.Entanglement.Packets
         // Optional 
         public Guid? Eid { get; set; }
 
-    public Guid InterfaceId { get; set; }
+        public Guid InterfaceId { get; set; }
     }
 }

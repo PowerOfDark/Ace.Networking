@@ -583,8 +583,8 @@ namespace Ace.Networking
         {
             if (Socket == null || !Connected) throw new SocketException((int) SocketError.NotInitialized);
 
-            _payloadPending = msg;
-            _payloadPendingType = msg.GetType();
+            _payloadPending = msg.GetPayload();
+            _payloadPendingType = _payloadPending.GetType();
             //_sendLock.Wait();
             _encoder.Prepare(msg);
             bool isComplete;
@@ -658,7 +658,8 @@ namespace Ace.Networking
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Task EnqueueSend<T>(T payload)
         {
-            if (payload is IPreparedPacket p) return EnqueueSendPacket(p);
+            if (payload is IPreparedPacket p)
+                return EnqueueSendPacket(p);
             return EnqueueSendContent(payload);
         }
 

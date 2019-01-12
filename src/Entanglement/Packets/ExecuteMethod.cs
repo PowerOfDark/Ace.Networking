@@ -11,17 +11,33 @@ namespace Ace.Networking.Entanglement.Packets
 {
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
     [Guid("E2FE3BD2-6978-4CB6-B498-2289F31E1C98")]
-    public class ExecuteMethod : ISerializationListener
+    public class ExecuteMethod : IDynamicPayload
     {
-        internal Type _ReturnType;
+        //internal Type _ReturnType;
         internal object[] Objects;
-        internal Type[] Types;
+        //internal Type[] Types;
         public Guid Eid { get; set; }
         public string Method { get; set; }
-        public byte[] ReturnType { get; set; }
 
-        public byte[][] Arguments { get; set; }
+        public void Construct(object[] payload)
+        {
+            Objects = new object[payload.Length - 1];
+            Array.Copy(payload, 1, Objects, 0, Objects.Length);
+        }
 
+        public object[] Deconstruct()
+        {
+            if (Objects == null)
+                Objects = new object[0];
+            var obj = new object[Objects.Length+1];
+            obj[0] = this;
+            Array.Copy(Objects, 0, obj, 1, Objects.Length);
+            return obj;
+        }
+        //public byte[] ReturnType { get; set; }
+
+        //public byte[][] Arguments { get; set; }
+        /*
         public void PreSerialize(IPayloadSerializer serializer, Stream stream)
         {
             lock (Method)
@@ -83,5 +99,6 @@ namespace Ace.Networking.Entanglement.Packets
                 ReturnType = null;
             }
         }
+        */
     }
 }

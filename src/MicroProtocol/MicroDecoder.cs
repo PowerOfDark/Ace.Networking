@@ -15,7 +15,7 @@ namespace Ace.Networking.MicroProtocol
         /// <summary>
         ///     Protocol version
         /// </summary>
-        public const byte Version = 2;
+        public const byte Version = 3;
 
         private RecyclableMemoryStream _contentStream;// = new MemoryStream();
 
@@ -30,6 +30,10 @@ namespace Ace.Networking.MicroProtocol
         private RawDataHeader.RawDataHandler _rawDataReceived;
         private int _socketBufferOffset;
         private Func<SocketBuffer, bool> _stateMethod;
+        private int[] _contentLengths;
+        private int _payloadPosition;
+        private object[] _objects;
+        private Type _firstType;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="MicroDecoder" /> class.
@@ -56,7 +60,10 @@ namespace Ace.Networking.MicroProtocol
             _contentStream?.Dispose();
             _headerOffset = 0;
             _socketBufferOffset = 0;
+            _contentLengths = null;
+            _objects = null;
             _stateMethod = ReadHeaderLength;
+            _payloadPosition = 0;
         }
 
         /// <summary>
@@ -149,7 +156,14 @@ namespace Ace.Networking.MicroProtocol
             _headerObject = BasicHeader.Upgrade(_contentStream);
 
             _stateMethod = ProcessContent;
-            _bytesLeftForCurrentState = (_headerObject as ContentHeader)?.ContentLength ?? -1;
+            var contentHeader = _headerObject as ContentHeader;
+            if(contentHeader != null)
+            {
+                _contentLengths = contentHeader.ContentLength;
+                if(contentHeader.PacketFlag.HasFlag(PacketFlag.MultiContent))
+                    _objects = new object[contentHeader.ContentLength.Length];
+            }
+            _bytesLeftForCurrentState = contentHeader?.ContentLength[0] ?? -1;
             if (_headerObject.PacketType == PacketType.RawData)
                 _bytesLeftForCurrentState = (_headerObject as RawDataHeader)?.ContentLength ?? -1;
 
@@ -166,6 +180,7 @@ namespace Ace.Networking.MicroProtocol
                 _contentStream.Position = 0;
                 _contentStream.ReserveSingleBlock(_bytesLeftForCurrentState);
             }
+
 
             return true;
         }
@@ -185,7 +200,7 @@ namespace Ace.Networking.MicroProtocol
             SKIP_CHECKS:
 
             _bytesLeftForCurrentState = sizeof(ushort);
-            _headerOffset = 0;
+            //_headerOffset = 0;
             _stateMethod = ReadHeaderLength;
             _contentStream?.Seek(0, SeekOrigin.Begin);
 
@@ -201,26 +216,50 @@ namespace Ace.Networking.MicroProtocol
             if (!isProcessed && _headerObject is ContentHeader content)
             {
                 var contentType = content.ContentType;
-                var packet = new DefaultContentPacket(content, null);
-                if (_contentStream == null)
+                //var packet = new DefaultContentPacket(content, null);
+                Type type;
+                object payload;
+                if (_contentStream.Length == 0)
                 {
-                    packet.Payload = null;
-                    packet.Type = typeof(object);
+                    payload = null;
+                    type = typeof(object);
                 }
                 else
                 {
                     var message = Serializer.Deserialize(contentType, _contentStream, out var resolvedType);
-                    packet.Payload = message;
-                    packet.Type = resolvedType;
+                    payload = message;
+                    type = resolvedType;
                 }
-                PacketReceived(packet.Header, packet.Payload, packet.Type);
+                if (_objects != null)
+                {
+                    _objects[_payloadPosition++] = payload;
+                    if (_payloadPosition == 1)
+                        _firstType = type;
+                    if (_payloadPosition == _objects.Length)
+                    {
+                        (_objects[0] as IDynamicPayload).Construct(_objects);
+                        PacketReceived(content, _objects[0], _firstType);
+                        _contentLengths = null;
+                        _payloadPosition = 0;
+                        _objects = null;
+                    }
+                }
+                else
+                {
+                    PacketReceived(content, payload, type);
+                }
                 isProcessed = true;
             }
 
             if (isProcessed)
             {
-                //_contentStream?.Dispose();
                 _contentStream?.SetLength(0);
+                if(_objects != null)
+                {
+                    _stateMethod = ProcessContent;
+                    _bytesLeftForCurrentState = _contentLengths[_payloadPosition];
+                }
+            
                 return true;
             }
 

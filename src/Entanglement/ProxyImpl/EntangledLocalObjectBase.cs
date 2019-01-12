@@ -32,7 +32,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
         public ExecuteMethod GetExecuteMethodDescriptor(string name, Type returnType, params object[] arg)
         {
-            byte[][] arguments = null;
+            /*byte[][] arguments = null;
             if ((arg?.Length??0) > 0)
             {
                 arguments = new byte[arg.Length][];
@@ -47,13 +47,14 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                     }
                 }
 
-            }
+            }*/
             var exe = new ExecuteMethod
             {
                 Eid = _Eid,
-                Arguments = arguments,
+                //Arguments = arguments,
                 Method = name,
-                _ReturnType = returnType
+                //_ReturnType = returnType
+                Objects = arg
             };
             return exe;
         }
@@ -64,8 +65,8 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             var res = await Host.SendRequest<ExecuteMethod, ExecuteMethodResult>(desc).ConfigureAwait(false);
             if (res.ExceptionAdapter != null)
                 throw new RemoteException(res.ExceptionAdapter);
-            if (res.SerializedData == null || res.SerializedData.Length == 0) return default;
-            return res.SerializedData.Deserialize<T>(this.Host.Serializer);
+            if (res.Data == null) return default;
+            return (T)res.Data;
         }
 
         public T ExecuteMethodSync<T>(string name, params object[] arg)
@@ -103,8 +104,6 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
             foreach (var update in updates.Updates) OnPropertyChanged(update.PropertyName);
         }
-
-        public event EventHandler sit;
 
 
         public void RaiseEvent(IConnection host, RaiseEvent data)

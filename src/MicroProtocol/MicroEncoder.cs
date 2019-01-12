@@ -35,6 +35,8 @@ namespace Ace.Networking.MicroProtocol
         private int _headerLength;
         private int _contentLength;
         private object _message;
+        private int[] _contentLengths;
+        private int _payloadPosition;
 
 
         private MicroEncoder()
@@ -94,7 +96,7 @@ namespace Ace.Networking.MicroProtocol
         {
             _header = header;
             _message = payload;
-            _headerIsSent = false;
+            _headerIsSent = _headerCreated = false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -177,6 +179,8 @@ namespace Ace.Networking.MicroProtocol
         {
             _bytesTransferred = 0;
             _bytesLeftToSend = 0;
+            _payloadPosition = 0;
+            _contentLengths = null;
             if (_disposeBodyStream)
             {
                 //bodyStream is null for channels that connected
@@ -208,36 +212,46 @@ namespace Ace.Networking.MicroProtocol
                 if (_message is Stream)
                 {
                     throw new NotSupportedException();
-                    _bodyStream = (Stream) _message;
-                    content.ContentType = PayloadSerializerBase.NullSerializer;
                 }
                 else if (_message is byte[] buf)
                 {
                     throw new NotSupportedException();
-                    _bodyStream = new MemoryStream(buf);
-                    _bodyStream.SetLength(buf.Length);
-                    content.ContentType = PayloadSerializerBase.NullSerializer;
-                    _disposeBodyStream = true;
                 }
                 else
                 {
-                    _bodyStream = _contentStream;////MemoryManager.Instance.GetStream();
-                    _disposeBodyStream = false;
+                    _bodyStream = _contentStream;
                     long pos = _bodyStream.Position;
-                    Serializer.Serialize(_message, _bodyStream, out var contentType);
-                    if (contentType == null) throw new InvalidOperationException($"Missing content type. Serializer: {Serializer.GetType().FullName}");
-                    if (contentType.Length > 2048)
-                        throw new InvalidOperationException(
-                            "The content type may not be larger than 2048 bytes. Type: " +
-                            _message.GetType().AssemblyQualifiedName);
-                    content.ContentType = contentType;
+                    if (_message is IDynamicPayload dp)
+                    {
+                        content.PacketFlag |= PacketFlag.MultiContent;
+                        var obj = dp.Deconstruct();
+                        content.ContentLength = new int[obj.Length];
+                        byte[] ct = null;
+                        for (int i = 0; i < obj.Length; i++)
+                        {
+                            long cur = _bodyStream.Position;
+                            Serializer.Serialize(obj[i], _bodyStream, out ct);
+                            content.ContentLength[i] = checked((int)(_bodyStream.Position - cur));
+                        }
+                        content.ContentType = ct;
+                    }
+                    else
+                    {
+                        byte[] contentType = null;
+                        Serializer.Serialize(_message, _bodyStream, out contentType);
+                        content.ContentType = contentType;
+                        content.ContentLength = new int[1] { checked((int)(_bodyStream.Position - pos)) };
+                    }
                     _bodyStream.Position = pos;
+                    contentLength = checked((int)(_bodyStream.Length - _bodyStream.Position));
                 }
 
-                contentLength = content.ContentLength = checked((int) (_bodyStream.Length - _bodyStream.Position));
-                if (content.ContentLength == 0)
+                if (contentLength == 0)
                     content.PacketFlag |= PacketFlag.NoContent;
+                if (content.ContentLength.Length > 1)
+                    content.PacketFlag |= PacketFlag.MultiContent;
             }
+
             else if (_header is RawDataHeader raw)
             {
                 _bodyStream = (Stream) _message;
@@ -247,7 +261,7 @@ namespace Ace.Networking.MicroProtocol
                 _disposeBodyStream = raw.DisposeStreamAfterSend;
             }
 
-            _headerStream.TryExtend(128);
+            _headerStream.TryExtend(512);
             _headerStream.Position = sizeof(short);
             _headerStream.Write(Version);
             _header.Serialize(_headerStream);
@@ -259,5 +273,6 @@ namespace Ace.Networking.MicroProtocol
 
             return len;
         }
+
     }
 }

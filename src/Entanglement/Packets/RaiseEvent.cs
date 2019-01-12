@@ -20,6 +20,14 @@ namespace Ace.Networking.Entanglement.Packets
     }
 
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+    [Guid("1CD56B3F-E6BD-1C34-8EF4-7F4DEA06E2A5")]
+    public class NullPlaceholder
+    {
+        public static readonly NullPlaceholder Instance = new NullPlaceholder();
+        public NullPlaceholder() { }
+    }
+
+    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
     [Guid("3CD56B1F-E5BD-4C34-8EF4-7F4DEA06E2E2")]
     public class RaiseEvent : ISerializationListener
     {

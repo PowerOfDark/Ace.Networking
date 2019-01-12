@@ -12,9 +12,9 @@ namespace Ace.Networking.MicroProtocol.Headers
 
         public byte[] ContentType { get; set; }
 
-        public ushort ContentTypeLength => checked((ushort) (ContentType?.Length ?? 0));
+        public ushort ContentTypeLength => checked((ushort)(ContentType?.Length ?? 0));
 
-        public int ContentLength { get; set; }
+        public int[] ContentLength { get; set; }
 
 
         public override BasicHeader Deserialize(RecyclableMemoryStream target)
@@ -23,7 +23,10 @@ namespace Ace.Networking.MicroProtocol.Headers
             var contentTypeLength = target.ReadUInt16();
             ContentType = new byte[contentTypeLength];
             target.Read(ContentType, 0, contentTypeLength);
-            ContentLength = target.ReadInt32();
+            int len = target.ReadInt16();
+            ContentLength = new int[len];
+            for (int i = 0; i < len; i++)
+                ContentLength[i] = target.ReadInt32();
 
             return this;
         }
@@ -35,7 +38,10 @@ namespace Ace.Networking.MicroProtocol.Headers
             target.Write((short)ContentTypeLength);
 
             target.Write(ContentType, 0, ContentTypeLength);
-            target.Write(ContentLength);
+            target.Write(checked((short)ContentLength.Length));
+            foreach (var i in ContentLength)
+                target.Write(i);
+
         }
     }
 }
