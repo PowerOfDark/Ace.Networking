@@ -100,5 +100,33 @@ namespace Ace.Networking.Tests
             stream.Read(array, 0, buf.Length);
             Assert.Equal(buf, array);
         }
+
+        [Fact]
+        public void ReadLastByteBlockOffsetTest()
+        {
+            var stream = GetStream(2.0f, 16);
+            var buf = RandomBuffer(16);
+            stream.Write(buf, 0, buf.Length);
+            stream.Position = 0;
+            var buf2 = new byte[buf.Length];
+            stream.Read(buf2, 0, buf.Length);
+            Assert.Equal(buf, buf2);
+            Assert.Equal(0, stream.CurrentBlockCapacity);
+        }
+
+        [Fact]
+        public void ReadSingleByteTest()
+        {
+            var stream = GetStream(2.0f, 1023);
+            var buf = RandomBuffer(16);
+            
+            stream.Write(buf);
+            
+            var byt = stream.ReadByte();
+            Assert.Equal(-1, byt);
+            stream.Position = 0;
+            byt = stream.ReadByte();
+            Assert.Equal(buf[0], byt);
+        }
     }
 }

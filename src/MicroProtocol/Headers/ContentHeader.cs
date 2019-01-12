@@ -1,4 +1,5 @@
 ﻿using System;
+using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Enums;
 
 namespace Ace.Networking.MicroProtocol.Headers
@@ -16,28 +17,25 @@ namespace Ace.Networking.MicroProtocol.Headers
         public int ContentLength { get; set; }
 
 
-        public override BasicHeader Deserialize(byte[] target, int offset = 0)
+        public override BasicHeader Deserialize(RecyclableMemoryStream target)
         {
-            base.Deserialize(target, offset);
-            var contentTypeLength = BitConverter.ToUInt16(target, offset + Position);
-            Position += sizeof(ushort);
+            base.Deserialize(target);
+            var contentTypeLength = target.ReadUInt16();
             ContentType = new byte[contentTypeLength];
-            for (var i = 0; i < contentTypeLength; i++) ContentType[i] = target[offset + Position++];
-            ContentLength = BitConverter.ToInt32(target, offset + Position);
-            Position += sizeof(int);
+            target.Read(ContentType, 0, contentTypeLength);
+            ContentLength = target.ReadInt32();
 
             return this;
         }
 
-        public override void Serialize(byte[] target, int offset = 0)
+        public override void Serialize(RecyclableMemoryStream target)
         {
-            base.Serialize(target, offset);
-            BitConverter2.GetBytes((short) ContentTypeLength, target, offset + Position);
-            Position += sizeof(ushort);
-            //Encoding.ASCII.GetBytes(ContentType, 0, ContentTypeLength, target, offset + Position); Position += ContentTypeLength;
-            for (var i = 0; i < ContentTypeLength; i++) target[offset + Position++] = ContentType[i];
-            BitConverter2.GetBytes(ContentLength, target, offset + Position);
-            Position += sizeof(int);
+            base.Serialize(target);
+
+            target.Write((short)ContentTypeLength);
+
+            target.Write(ContentType, 0, ContentTypeLength);
+            target.Write(ContentLength);
         }
     }
 }

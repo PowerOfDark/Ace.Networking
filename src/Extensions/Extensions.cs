@@ -86,12 +86,5 @@ namespace Ace.Networking.Extensions
             return new CancellationTokenSource(ts).Token;
         }
 
-        public static byte[] ToArray(this Stream stream)
-        {
-            var buf = new byte[stream.Length];
-            stream.Position = 0;
-            stream.Read(buf, 0, buf.Length);
-            return buf;
-        }
     }
 }

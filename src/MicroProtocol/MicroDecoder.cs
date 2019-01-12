@@ -18,7 +18,6 @@ namespace Ace.Networking.MicroProtocol
         public const byte Version = 2;
 
         private RecyclableMemoryStream _contentStream;// = new MemoryStream();
-        private readonly byte[] _header = new byte[short.MaxValue];
 
         private int _bytesLeftForCurrentState;
         private int _bytesLeftInSocketBuffer;
@@ -115,11 +114,12 @@ namespace Ace.Networking.MicroProtocol
         private bool ReadHeaderLength(SocketBuffer e)
         {
             if (!CopyBytes(e)) return false;
-
-            _headerSize = BitConverter.ToUInt16(_header, 0);
+            _contentStream.Position = 0;
+            _headerSize = _contentStream.ReadUInt16();
+            _contentStream.Position = 0;
             _bytesLeftForCurrentState = _headerSize - sizeof(ushort);
+            _contentStream.ReserveSingleBlock(_bytesLeftForCurrentState);
             _stateMethod = ProcessFixedHeader;
-            _headerOffset = 0;
             return true;
         }
 
@@ -130,8 +130,8 @@ namespace Ace.Networking.MicroProtocol
             if (_bytesLeftForCurrentState > 0)
             {
                 var toCopy = Math.Min(_bytesLeftForCurrentState, _bytesLeftInSocketBuffer);
-                Buffer.BlockCopy(e.Buffer, _socketBufferOffset, _header, _headerOffset, toCopy);
-                _headerOffset += toCopy;
+                _contentStream.Write(e.Buffer, _socketBufferOffset, toCopy);
+
                 _bytesLeftForCurrentState -= toCopy;
                 _bytesLeftInSocketBuffer -= toCopy;
                 _socketBufferOffset += toCopy;
@@ -143,10 +143,10 @@ namespace Ace.Networking.MicroProtocol
         private bool ProcessFixedHeader(SocketBuffer e)
         {
             if (!CopyBytes(e)) return false;
+            _contentStream.Position = 0;
+            _protocolVersion = (byte)_contentStream.ReadByte();
 
-            _protocolVersion = _header[0];
-
-            _headerObject = BasicHeader.Upgrade(_header, 1);
+            _headerObject = BasicHeader.Upgrade(_contentStream);
 
             _stateMethod = ProcessContent;
             _bytesLeftForCurrentState = (_headerObject as ContentHeader)?.ContentLength ?? -1;
@@ -159,14 +159,14 @@ namespace Ace.Networking.MicroProtocol
             {
                 _bytesLeftForCurrentState = -1;
                 _contentStream.SetLength(0);
-                //_contentStream = null;
+                
             }
             else
             {
-                //_contentStream = MemoryManager.Instance.GetStream(_bytesLeftForCurrentState);
+                _contentStream.Position = 0;
                 _contentStream.ReserveSingleBlock(_bytesLeftForCurrentState);
             }
-            _headerOffset = 0;
+
             return true;
         }
 

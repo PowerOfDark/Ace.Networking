@@ -16,9 +16,11 @@ namespace Ace.Networking.Memory
         private int _currentBlock = -1;
         private int _currentBlockOffset = 0;
         private long _currentOffset = 0;
-        private int CurrentBlockLength => _currentBlock < 0 ? 0 : Blocks[_currentBlock].Length;
-        private int CurrentBlockCapacity => CurrentBlockLength - _currentBlockOffset;
-        private byte[] CurrentBlock => Blocks[_currentBlock];
+        public int CurrentBlockOffset => _currentBlockOffset;
+        public int CurrentBlockLength => _currentBlock < 0 ? 0 : Blocks[_currentBlock].Length;
+        public int CurrentBlockCapacity => CurrentBlockLength - _currentBlockOffset;
+        public byte[] CurrentBlock => Blocks[_currentBlock];
+        public byte[] _buffer;
         //private float _stepCoefficient = 2.0f;
 
         private RecyclableMemoryStreamManager _mgr;
@@ -27,28 +29,33 @@ namespace Ace.Networking.Memory
         {
             _mgr = mgr;
             _nextSize = _mgr.BaseSize;
+            _buffer = mgr.Pool.Rent(8);
         }
 
         public bool ReserveSingleBlock(int length)
         {
-            SetLength(0);
-            return TryExtend(length, true);
+            if (length > _maxLength)
+            {
+                SetLength(0);
+                return TryExtend(length, true);
+            }
+            SetLength(length);
+            return true;
         }
 
-        private bool TryExtend(int length, bool fixedSize = false)
+        public bool TryExtend(int length, bool fixedSize = false)
         {
             if (_currentLength + length <= _maxLength) return false;
             while (_currentLength + length > _maxLength)
             {
                 var top = _mgr.Pool.Rent(fixedSize ? length : (int)_nextSize);
-                _nextSize = fixedSize ? _nextSize : FillNearest32((int)(_nextSize * _mgr.StepCoefficient));
+                _nextSize = fixedSize ? _nextSize : FillNearest32(checked((int)(_nextSize * _mgr.StepCoefficient)));
                 lock (Blocks)
                 {
                     Blocks.Add(top);
                     if (Blocks.Count == 1)
                         _currentBlock = 0;
                     _maxLength += top.Length;
-                    //length -= top.Length;
                 }
             }
             return true;
@@ -62,21 +69,45 @@ namespace Ace.Networking.Memory
             return length;
         }
 
+        
+        private void PopBlock()
+        {
+            var block = Blocks.Last();
+            Blocks.RemoveAt(Blocks.Count - 1);
+            if (Blocks.Count == 0)
+                _currentBlock = -1;
+            _mgr.Pool.Return(block);
+            _maxLength -= block.Length;
+            _nextSize = FillNearest32((int)(_nextSize / _mgr.StepCoefficient));
+        }
+
+       
+
         private void TryShrink()
         {
-            while(Blocks.Any() && _maxLength - Blocks.Last().Length >= _currentLength)
+            while(Blocks.Any() && _maxLength - Blocks.Last().Length >= _currentLength 
+                && _maxLength-Blocks.Last().Length >= _mgr.MinimumSize)
             {
-                var back = Blocks.Last();
-                Blocks.RemoveAt(Blocks.Count - 1);
-                if (Blocks.Count == 0)
-                    _currentBlock = -1;
-                _mgr.Pool.Return(back);
-                _maxLength -= back.Length;
-                _nextSize = FillNearest32((int)(_nextSize / _mgr.StepCoefficient));
+                PopBlock();
             }
-
+            if(Blocks.Count == 1 && Blocks.First().Length > _mgr.MinimumSize)
+            {
+                PopBlock();
+                TryExtend((int)_mgr.MinimumSize);
+            }
         }
         
+        public void ShrinkTo(long length)
+        {
+            if(_currentOffset >= length)
+                Seek(length - 1, SeekOrigin.Begin);
+            TryShrink();
+        }
+
+        public void ShrinkToBase()
+        {
+            ShrinkTo(_mgr.BaseSize);
+        }
 
         public override bool CanRead => true;
 
@@ -143,8 +174,15 @@ namespace Ace.Networking.Memory
 
         public override long Seek(long offset, SeekOrigin origin)
         {
+
             if (origin == SeekOrigin.Current) offset += _currentOffset;
             if (origin == SeekOrigin.End) offset = _currentLength - offset;
+            if (offset == 0)
+            {
+                _currentBlock = _currentBlockOffset = 0;
+                _currentOffset = 0;
+                return 0;
+            }
 
             if (offset < 0 || offset > _maxLength)
                 throw new InvalidOperationException();
@@ -159,7 +197,7 @@ namespace Ace.Networking.Memory
                     if (!MoveNext())
                         throw new IndexOutOfRangeException();
                 }
-                _currentBlockOffset = checked((int)diff);
+                _currentBlockOffset += checked((int)diff);
             }
             else if (diff < 0)
             {
@@ -184,12 +222,26 @@ namespace Ace.Networking.Memory
 
         public override void SetLength(long value)
         {
+            if(value == 0 && _mgr.MinimumSize == 0)
+            {
+                _currentLength = _maxLength = _currentOffset = 0;
+                _currentBlockOffset = 0;
+                _currentBlock = -1;
+                foreach (var b in Blocks)
+                    _mgr.Pool.Return(b);
+                _nextSize = _mgr.BaseSize;
+                Blocks.Clear();
+                return;
+            }
             if(value > _currentLength)
             {
-                if(!TryExtend(checked((int)(value - _currentLength))))
+                if (value > _maxLength)
                 {
-                    throw new OutOfMemoryException();
-                    //nothing
+                    if (!TryExtend(checked((int)(value - _currentLength))))
+                    {
+                        throw new OutOfMemoryException();
+                        //nothing
+                    }
                 }
                 _currentLength = value;
             }
@@ -224,11 +276,121 @@ namespace Ace.Networking.Memory
             _currentLength = Math.Max(_currentLength, _currentOffset);
         }
 
+        public void Write(bool value)
+        {
+            _buffer[0] = (byte)(value ? 1 : 0);
+            Write(_buffer, 0, 1);
+        }
+        public void Write(byte value)
+        {
+            WriteByte(value);
+        }
+        public void Write(sbyte value)
+        {
+            WriteByte((byte)value);
+        }
+        public void Write(short value)
+        {
+            _buffer[0] = (byte)value;
+            _buffer[1] = (byte)(value >> 8);
+            Write(_buffer, 0, 2);
+        }
+        public void Write(ushort value)
+        {
+            _buffer[0] = (byte)value;
+            _buffer[1] = (byte)(value >> 8);
+            Write(_buffer, 0, 2);
+        }
+
+        public void Write(int value)
+        {
+            _buffer[0] = (byte)value;
+            _buffer[1] = (byte)(value >> 8);
+            _buffer[2] = (byte)(value >> 16);
+            _buffer[3] = (byte)(value >> 24);
+            Write(_buffer, 0, 4);
+        }
+
+        public void Write(uint value)
+        {
+            _buffer[0] = (byte)value;
+            _buffer[1] = (byte)(value >> 8);
+            _buffer[2] = (byte)(value >> 16);
+            _buffer[3] = (byte)(value >> 24);
+            Write(_buffer, 0, 4);
+        }
+
+        public void Write(long value)
+        {
+            _buffer[0] = (byte)value;
+            _buffer[1] = (byte)(value >> 8);
+            _buffer[2] = (byte)(value >> 16);
+            _buffer[3] = (byte)(value >> 24);
+            _buffer[4] = (byte)(value >> 32);
+            _buffer[5] = (byte)(value >> 40);
+            _buffer[6] = (byte)(value >> 48);
+            _buffer[7] = (byte)(value >> 56);
+            Write(_buffer, 0, 8);
+        }
+
+        public void Write(ulong value)
+        {
+            _buffer[0] = (byte)value;
+            _buffer[1] = (byte)(value >> 8);
+            _buffer[2] = (byte)(value >> 16);
+            _buffer[3] = (byte)(value >> 24);
+            _buffer[4] = (byte)(value >> 32);
+            _buffer[5] = (byte)(value >> 40);
+            _buffer[6] = (byte)(value >> 48);
+            _buffer[7] = (byte)(value >> 56);
+            Write(_buffer, 0, 8);
+        }
+
+        public bool ReadBoolean()
+        {
+            Read(_buffer, 0, 1);
+            return _buffer[0] != 0;
+        }
+        public short ReadInt16()
+        {
+            Read(_buffer, 0, 2);
+            return (short)(_buffer[0] | _buffer[1] << 8);
+        }
+        public ushort ReadUInt16()
+        {
+            Read(_buffer, 0, 2);
+            return (ushort)(_buffer[0] | _buffer[1] << 8);
+        }
+        public int ReadInt32()
+        {
+            Read(_buffer, 0, 4);
+            return (int)(_buffer[0] | _buffer[1] << 8 | _buffer[2] << 16 | _buffer[3] << 24);
+        }
+
+        public uint ReadUInt32()
+        {
+            Read(_buffer, 0, 4);
+            return (uint)(_buffer[0] | _buffer[1] << 8 | _buffer[2] << 16 | _buffer[3] << 24);
+        }
+
+        public long ReadInt64()
+        {
+            Read(_buffer, 0, 8);
+            return (long)(_buffer[0] | _buffer[1] << 8 | _buffer[2] << 16 | _buffer[3] << 24 | _buffer[4] << 32 | _buffer[5] << 40 | _buffer[6] << 48 | _buffer[7] << 56);
+        }
+
+        public ulong ReadUInt64()
+        {
+            Read(_buffer, 0, 8);
+            return (ulong)(_buffer[0] | _buffer[1] << 8 | _buffer[2] << 16 | _buffer[3] << 24 | _buffer[4] << 32 | _buffer[5] << 40 | _buffer[6] << 48 | _buffer[7] << 56);
+        }
+
         protected override void Dispose(bool disposing)
         {
             if(disposing)
             {
                 SetLength(0);
+                _mgr.Pool.Return(_buffer);
             }
             base.Dispose(disposing);
         }

@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Enums;
 
 namespace Ace.Networking.MicroProtocol.Headers
@@ -11,31 +12,29 @@ namespace Ace.Networking.MicroProtocol.Headers
             PacketFlag = PacketFlag.None;
         }
 
-        public int Position;// { get; set; }
 
         public PacketType PacketType;// { get; set; }
         public PacketFlag PacketFlag;// { get; set; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public virtual void Serialize(byte[] target, int offset = 0)
+        public virtual void Serialize(RecyclableMemoryStream target)
         {
-            Position = 0;
-            target[Position++ + offset] = (byte) PacketType;
-            target[Position++ + offset] = (byte) PacketFlag;
+            target.WriteByte((byte)PacketType);
+            target.WriteByte((byte)PacketFlag);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public virtual BasicHeader Deserialize(byte[] target, int offset = 0)
+        public virtual BasicHeader Deserialize(RecyclableMemoryStream target)
         {
-            Position = 0;
-            PacketType = (PacketType) target[Position++ + offset];
-            PacketFlag = (PacketFlag) target[Position++ + offset];
+            PacketType = (PacketType)target.ReadByte();
+            PacketFlag = (PacketFlag)target.ReadByte();
             return this;
         }
 
-        public static BasicHeader Upgrade(byte[] target, int offset = 0)
+        public static BasicHeader Upgrade(RecyclableMemoryStream target)
         {
-            var type = (PacketType) target[offset];
+            var type = (PacketType)target.ReadByte();
+            target.Seek(-1, System.IO.SeekOrigin.Current);
             BasicHeader upgraded;
             switch (type)
             {
@@ -53,7 +52,7 @@ namespace Ace.Networking.MicroProtocol.Headers
                     break;
             }
 
-            return upgraded.Deserialize(target, offset);
+            return upgraded.Deserialize(target);
         }
     }
 }

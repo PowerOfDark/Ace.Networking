@@ -81,7 +81,8 @@ namespace Ace.Networking.Threading
             }
             else
             {
-                _timer = new Timer(Monitor, null, 0, Timeout.Infinite);
+                _timer = new Timer(Monitor, null, Timeout.Infinite, Timeout.Infinite);
+                _timer.Change(0, Timeout.Infinite);
             }
         }
 

@@ -9,5 +9,6 @@ namespace Ace.Networking
     public static class NetworkingSettings
     {
         public static ITypeResolver DefaultTypeResolver { get; } = new DeepGuidTypeResolver();
+        public const int BufferSize = 8192;
     }
 }

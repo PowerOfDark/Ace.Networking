@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Enums;
 
 namespace Ace.Networking.MicroProtocol.Headers
@@ -29,21 +30,20 @@ namespace Ace.Networking.MicroProtocol.Headers
         //[NotMapped]
         internal bool DisposeStreamAfterSend { get; set; }
 
-        public override void Serialize(byte[] target, int offset = 0)
+        public override void Serialize(RecyclableMemoryStream target)
         {
-            base.Serialize(target, offset);
-            Position += BitHelper.WriteInt(target, Position + offset, RawDataBufferId, RawDataSeq, ContentLength);
+            base.Serialize(target);
+            target.Write(RawDataBufferId);
+            target.Write(RawDataSeq);
+            target.Write(ContentLength);
         }
 
-        public override BasicHeader Deserialize(byte[] target, int offset = 0)
+        public override BasicHeader Deserialize(RecyclableMemoryStream target)
         {
-            base.Deserialize(target, offset);
-            RawDataBufferId = BitConverter.ToInt32(target, offset + Position);
-            Position += sizeof(int);
-            RawDataSeq = BitConverter.ToInt32(target, offset + Position);
-            Position += sizeof(int);
-            ContentLength = BitConverter.ToInt32(target, offset + Position);
-            Position += sizeof(int);
+            base.Deserialize(target);
+            RawDataBufferId = target.ReadInt32();
+            RawDataSeq = target.ReadInt32();
+            ContentLength = target.ReadInt32();
 
             return this;
         }

@@ -22,20 +22,25 @@ namespace Ace.Networking.MicroProtocol
         private readonly IBufferSlice _bufferSlice;
 
         private RecyclableMemoryStream _contentStream;
+        private RecyclableMemoryStream _headerStream;
         private Stream _bodyStream;
+
         private int _bytesEnqueued;
         private int _bytesLeftToSend;
         private int _bytesTransferred;
         private bool _disposeBodyStream = true;
         private BasicHeader _header;
         private bool _headerIsSent;
-        private int _headerSize;
+        private bool _headerCreated;
+        private int _headerLength;
+        private int _contentLength;
         private object _message;
 
 
         private MicroEncoder()
         {
             _contentStream = MemoryManager.Instance.GetStream();
+            _headerStream = MemoryManager.Instance.GetStream();
         }
         /// <summary>
         ///     Initializes a new instance of the <see cref="MicroEncoder" /> class.
@@ -43,10 +48,9 @@ namespace Ace.Networking.MicroProtocol
         /// <param name="serializer">
         ///     Serializer used to serialize the messages that should be sent.
         /// </param>
-        public MicroEncoder(IPayloadSerializer serializer)
+        public MicroEncoder(IPayloadSerializer serializer) : this()
         {
             Serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
-            _bufferSlice = new BufferSlice(new byte[65535], 0, 65535);
 
         }
 
@@ -60,7 +64,7 @@ namespace Ace.Networking.MicroProtocol
         /// <exception cref="ArgumentOutOfRangeException">
         ///     bufferSlice; At least the header should fit in the buffer
         /// </exception>
-        public MicroEncoder(IPayloadSerializer serializer, IBufferSlice bufferSlice)
+        public MicroEncoder(IPayloadSerializer serializer, IBufferSlice bufferSlice): this()
         {
             if (bufferSlice == null) throw new ArgumentNullException(nameof(bufferSlice));
             if (bufferSlice.Capacity < 520 - 256 + 2048)
@@ -111,28 +115,28 @@ namespace Ace.Networking.MicroProtocol
         /// <param name="args">Socket buffer</param>
         public void Send(SocketBuffer args)
         {
-            if (_bytesTransferred < _bytesEnqueued)
-            {
-                //TODO: Is this faster than moving the bytes to the beginning of the buffer and append more bytes?
-                args.SetBuffer(_bufferSlice.Buffer, _bufferSlice.Offset + _bytesTransferred,
-                    _bytesEnqueued - _bytesTransferred);
-                return;
-            }
-
             if (!_headerIsSent)
             {
-                var headerLength = CreateHeader(out var streamLen);
-                var bytesToWrite = Math.Min(_bufferSlice.Capacity - headerLength, streamLen);
-                _bodyStream.Read(_bufferSlice.Buffer, _bufferSlice.Offset + headerLength, bytesToWrite);
-                args.SetBuffer(_bufferSlice.Buffer, _bufferSlice.Offset, bytesToWrite + headerLength);
-                _bytesEnqueued = headerLength + bytesToWrite;
-                _bytesLeftToSend = headerLength + streamLen;
+                if (!_headerCreated)
+                {
+                    var headerLength = CreateHeader(out _contentLength);
+                    _headerStream.Position = _contentStream.Position = 0;
+                    _headerCreated = true;
+                    _bytesLeftToSend = headerLength;
+                }
+                if (_headerStream.CurrentBlockCapacity == 0)
+                    _headerStream.MoveNext();
+                var toWrite = Math.Min(NetworkingSettings.BufferSize, Math.Min(_headerStream.CurrentBlockCapacity, _bytesLeftToSend));
+                args.SetBuffer(_headerStream.CurrentBlock, _headerStream.CurrentBlockOffset, toWrite);
+                _headerStream.Position += toWrite;
             }
             else
             {
-                _bytesEnqueued = Math.Min(_bufferSlice.Capacity, _bytesLeftToSend);
-                _bodyStream.Read(_bufferSlice.Buffer, _bufferSlice.Offset, _bytesEnqueued);
-                args.SetBuffer(_bufferSlice.Buffer, _bufferSlice.Offset, _bytesEnqueued);
+                if (_contentStream.CurrentBlockCapacity == 0)
+                    _contentStream.MoveNext();
+                var toWrite = Math.Min(NetworkingSettings.BufferSize, Math.Min(_contentStream.CurrentBlockCapacity, _bytesLeftToSend));
+                args.SetBuffer(_contentStream.CurrentBlock, _contentStream.CurrentBlockOffset, toWrite);
+                _contentStream.Position += toWrite;
             }
         }
 
@@ -147,18 +151,20 @@ namespace Ace.Networking.MicroProtocol
         {
             // Make sure that the header is sent
             // required so that the Send() method can switch to the body state.
+            _bytesTransferred += bytesTransferred;
+            _bytesLeftToSend -= bytesTransferred;
             if (!_headerIsSent)
             {
-                _headerSize -= bytesTransferred;
-                if (_headerSize <= 0)
+                //_headerLength -= bytesTransferred;
+                if (_bytesLeftToSend <= 0)
                 {
                     _headerIsSent = true;
-                    _headerSize = 0;
+                    _bytesTransferred = 0;
+                    _bytesLeftToSend = _contentLength;
                 }
             }
 
-            _bytesTransferred = bytesTransferred;
-            _bytesLeftToSend -= bytesTransferred;
+            //_bytesTransferred = bytesTransferred;
             if (_bytesLeftToSend == 0) Clear();
 
             return _bytesLeftToSend == 0;
@@ -169,10 +175,8 @@ namespace Ace.Networking.MicroProtocol
         /// </summary>
         public void Clear()
         {
-            _bytesEnqueued = 0;
             _bytesTransferred = 0;
             _bytesLeftToSend = 0;
-
             if (_disposeBodyStream)
             {
                 //bodyStream is null for channels that connected
@@ -182,12 +186,12 @@ namespace Ace.Networking.MicroProtocol
                 _bodyStream = null;
             }
 
+            _headerStream.SetLength(0);
+            _contentStream.SetLength(0);
 
-
-            _headerIsSent = false;
-            _headerSize = 0;
+            _headerIsSent = _headerCreated = false;
             _message = null;
-            _disposeBodyStream = true;
+            _disposeBodyStream = false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -217,8 +221,9 @@ namespace Ace.Networking.MicroProtocol
                 }
                 else
                 {
-                    _bodyStream = MemoryManager.Instance.GetStream();
-                    _disposeBodyStream = true;
+                    _bodyStream = _contentStream;////MemoryManager.Instance.GetStream();
+                    _disposeBodyStream = false;
+                    long pos = _bodyStream.Position;
                     Serializer.Serialize(_message, _bodyStream, out var contentType);
                     if (contentType == null) throw new InvalidOperationException($"Missing content type. Serializer: {Serializer.GetType().FullName}");
                     if (contentType.Length > 2048)
@@ -226,7 +231,7 @@ namespace Ace.Networking.MicroProtocol
                             "The content type may not be larger than 2048 bytes. Type: " +
                             _message.GetType().AssemblyQualifiedName);
                     content.ContentType = contentType;
-                    _bodyStream.Position = 0;
+                    _bodyStream.Position = pos;
                 }
 
                 contentLength = content.ContentLength = checked((int) (_bodyStream.Length - _bodyStream.Position));
@@ -242,19 +247,17 @@ namespace Ace.Networking.MicroProtocol
                 _disposeBodyStream = raw.DisposeStreamAfterSend;
             }
 
-            var sliceOffset = _bufferSlice.Offset;
-            var sliceBuffer = _bufferSlice.Buffer;
+            _headerStream.TryExtend(128);
+            _headerStream.Position = sizeof(short);
+            _headerStream.Write(Version);
+            _header.Serialize(_headerStream);
+            short len = (short)_headerStream.Position;
+            if (_headerStream.Position > ushort.MaxValue)
+                throw new InvalidDataException("Invalid header");
+            _headerStream.Position = 0;
+            _headerStream.Write(len);
 
-
-            const int baseHeaderSize = /* header length */ sizeof(short) + /* encoder version */ sizeof(byte);
-            _headerSize = baseHeaderSize; //
-            sliceBuffer[sliceOffset + sizeof(short)] = Version;
-            _header.Serialize(_bufferSlice.Buffer, sliceOffset + _headerSize);
-            _headerSize += _header.Position;
-            if (_headerSize > ushort.MaxValue) throw new InvalidDataException("Invalid header");
-            BitConverter2.GetBytes((short) _headerSize, sliceBuffer, sliceOffset);
-
-            return _headerSize;
+            return len;
         }
     }
 }

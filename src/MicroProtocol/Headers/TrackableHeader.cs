@@ -1,4 +1,5 @@
 ﻿using System;
+using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Enums;
 
 namespace Ace.Networking.MicroProtocol.Headers
@@ -17,19 +18,17 @@ namespace Ace.Networking.MicroProtocol.Headers
 
         public int RequestId { get; set; }
 
-        public override BasicHeader Deserialize(byte[] target, int offset = 0)
+        public override BasicHeader Deserialize(RecyclableMemoryStream target)
         {
-            base.Deserialize(target, offset);
-            RequestId = BitConverter.ToInt32(target, Position + offset);
-            Position += sizeof(int);
+            base.Deserialize(target);
+            RequestId = target.ReadInt32();
             return this;
         }
 
-        public override void Serialize(byte[] target, int offset = 0)
+        public override void Serialize(RecyclableMemoryStream target)
         {
-            base.Serialize(target, offset);
-            BitConverter2.GetBytes(RequestId, target, offset + Position);
-            Position += sizeof(int);
+            base.Serialize(target);
+            target.Write(RequestId);
         }
     }
 }
