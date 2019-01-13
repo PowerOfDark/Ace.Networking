@@ -21,7 +21,7 @@ namespace Ace.Networking
         IConnectionBuilder UseClientSsl(string targetCommonName = "",
             X509Certificate2 certificate = null, SslProtocols protocols = SslProtocols.Tls12);
 
-        IConnection UseServerSsl(X509Certificate2 certificate = null, bool useClient = true,
+        IConnectionBuilder UseServerSsl(X509Certificate2 certificate = null, bool useClient = true,
             SslProtocols protocols = SslProtocols.Tls12);
 
         IConnectionBuilder UseData(IConnectionData data);
