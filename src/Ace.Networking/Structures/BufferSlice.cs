@@ -1,7 +1,7 @@
 ﻿using System;
-using Ace.Networking.Threading;
+using Ace.Networking.Structures;
 
-namespace Ace.Networking.MicroProtocol.Structures
+namespace Ace.Networking.Structures
 {
     public class BufferSlice : IBufferSlice
     {

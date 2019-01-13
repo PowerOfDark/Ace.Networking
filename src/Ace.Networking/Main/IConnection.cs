@@ -1,10 +1,12 @@
 ﻿using System;
 using Ace.Networking.Handlers;
+using Ace.Networking.Interfaces;
 using Ace.Networking.MicroProtocol.Headers;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.Services;
+using Ace.Networking.Structures;
 
-namespace Ace.Networking.Threading
+namespace Ace.Networking
 {
     public interface IConnection : IConnectionInterface, IServiceContainer<IConnection>
     {

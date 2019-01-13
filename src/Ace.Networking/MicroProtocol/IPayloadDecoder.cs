@@ -1,9 +1,10 @@
 ﻿using System;
 using Ace.Networking.MicroProtocol.Headers;
 using Ace.Networking.MicroProtocol.Structures;
+using Ace.Networking.Serializers;
 using static Ace.Networking.MicroProtocol.Headers.RawDataHeader;
 
-namespace Ace.Networking.MicroProtocol.Interfaces
+namespace Ace.Networking.MicroProtocol
 {
     public interface IPayloadDecoder
     {

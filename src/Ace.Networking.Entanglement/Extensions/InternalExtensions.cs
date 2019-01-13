@@ -5,6 +5,7 @@ using System.Text;
 using Ace.Networking.Extensions;
 using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Interfaces;
+using Ace.Networking.Serializers;
 
 namespace Ace.Networking.Entanglement.Extensions
 {

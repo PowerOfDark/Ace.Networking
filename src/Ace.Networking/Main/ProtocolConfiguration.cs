@@ -5,11 +5,10 @@ using System.Reflection;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using Ace.Networking.MicroProtocol;
-using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.SSL;
 using Ace.Networking.Serializers;
-using Ace.Networking.Serializers.Protobuf;
 using Ace.Networking.Threading;
+using Ace.Networking.Threading.Workers;
 using Ace.Networking.TypeResolvers;
 
 namespace Ace.Networking

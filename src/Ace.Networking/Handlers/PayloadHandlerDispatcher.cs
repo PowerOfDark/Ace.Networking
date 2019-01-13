@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Ace.Networking.Extensions;
+using Ace.Networking.Interfaces;
 using Ace.Networking.Threading;
 
 namespace Ace.Networking.Handlers
@@ -18,42 +19,6 @@ namespace Ace.Networking.Handlers
         public bool OffRequest<T>(RequestHandler handler)
         {
             return OffRequest(typeof(T), handler);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected void AppendPayloadHandler(Type type, PayloadHandler handler)
-        {
-            AppendTypeHandler(type, new PayloadHandlerWrapper(handler));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected void AppendPayloadHandler<T>(PayloadHandler handler)
-        {
-            AppendPayloadHandler(typeof(T), handler);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected bool RemovePayloadHandler(Type type, PayloadHandler handler)
-        {
-            return RemoveTypeHandler(type, handler);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected bool RemovePayloadHandler<T>(PayloadHandler handler)
-        {
-            return RemovePayloadHandler(typeof(T), handler);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected void AppendGenericPayloadHandler<T>(GenericPayloadHandler<T> handler)
-        {
-            AppendTypeHandler(typeof(T), new GenericPayloadHandlerWrapper<T>(handler));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected bool RemoveGenericPayloadHandler<T>(GenericPayloadHandler<T> handler)
-        {
-            return RemoveTypeHandler(typeof(T), handler);
         }
 
 
@@ -106,31 +71,9 @@ namespace Ace.Networking.Handlers
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Off()
-        {
-            RemoveAllTypeHandlers();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void OnRequest(Type type, RequestHandler handler)
         {
             RequestHandlers.Append(type, handler);
-        }
-
-        /// <summary>
-        ///     Returns the current request handlers for the specified type, or null if doesn't exist
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public IReadOnlyCollection<RequestHandler> OnRequest(Type type)
-        {
-            if (RequestHandlers.TryGetValue(type, out var handler)) return handler;
-            return null;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public IReadOnlyCollection<RequestHandler> OnRequest<T>()
-        {
-            return OnRequest(typeof(T));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -152,10 +95,68 @@ namespace Ace.Networking.Handlers
             return OffRequest(typeof(T));
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void AppendPayloadHandler(Type type, PayloadHandler handler)
+        {
+            AppendTypeHandler(type, new PayloadHandlerWrapper(handler));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void AppendPayloadHandler<T>(PayloadHandler handler)
+        {
+            AppendPayloadHandler(typeof(T), handler);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected bool RemovePayloadHandler(Type type, PayloadHandler handler)
+        {
+            return RemoveTypeHandler(type, handler);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected bool RemovePayloadHandler<T>(PayloadHandler handler)
+        {
+            return RemovePayloadHandler(typeof(T), handler);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void AppendGenericPayloadHandler<T>(GenericPayloadHandler<T> handler)
+        {
+            AppendTypeHandler(typeof(T), new GenericPayloadHandlerWrapper<T>(handler));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected bool RemoveGenericPayloadHandler<T>(GenericPayloadHandler<T> handler)
+        {
+            return RemoveTypeHandler(typeof(T), handler);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Off()
+        {
+            RemoveAllTypeHandlers();
+        }
+
+        /// <summary>
+        ///     Returns the current request handlers for the specified type, or null if doesn't exist
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public IReadOnlyCollection<RequestHandler> OnRequest(Type type)
+        {
+            if (RequestHandlers.TryGetValue(type, out var handler)) return handler;
+            return null;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public IReadOnlyCollection<RequestHandler> OnRequest<T>()
+        {
+            return OnRequest(typeof(T));
+        }
+
         protected bool ProcessPayloadHandlers(IConnection connection, object obj, Type type,
             Action<object> responseSender = null, int? requestId = null)
         {
-            bool handled = false;
+            var handled = false;
             if (TypeHandlers.TryGetValue(type, out var list))
                 lock (list)
                 {
@@ -166,7 +167,6 @@ namespace Ace.Networking.Handlers
                             var r = f.Invoke(connection, obj, type);
                             responseSender?.Invoke(r);
                             handled |= r != null;
-                            
                         }
                     }
                     catch

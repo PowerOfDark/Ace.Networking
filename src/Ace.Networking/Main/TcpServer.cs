@@ -5,12 +5,10 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Ace.Networking.Handlers;
-using Ace.Networking.Threading;
-using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.SSL;
+using Ace.Networking.Serializers;
 using Ace.Networking.Services;
 using Ace.Networking.TypeResolvers;
-using static Ace.Networking.Connection;
 
 namespace Ace.Networking
 {
@@ -32,7 +30,6 @@ namespace Ace.Networking
         private TimeSpan? _receiveTimeoutCheck;
         private volatile bool _shuttingDown;
 
-        
 
         public TcpServer(IPEndPoint endpoint, IConnectionBuilder connectionBuilder,
             IInternalServiceManager<IServer> services = null)
@@ -40,13 +37,10 @@ namespace Ace.Networking
             Connections = new ConcurrentDictionary<long, IConnection>();
             Endpoint = endpoint;
             ConnectionBuilder = connectionBuilder.UseDispatcher(Con_DispatchPayload);
-            
+
             _timer = new Timer(Timer_Tick, null, 0, System.Threading.Timeout.Infinite);
             _services = services ?? ServicesManager<IServer>.Empty;
         }
-
-        public ITypeResolver TypeResolver => ConnectionBuilder?.GetTypeResolver();
-        public IPayloadSerializer Serializer => ConnectionBuilder?.GetSerializer();
 
         protected IConnectionBuilder ConnectionBuilder { get; }
 
@@ -88,12 +82,14 @@ namespace Ace.Networking
         public ConcurrentDictionary<long, IConnection> Connections { get; }
 
         public ProtocolConfiguration Configuration { get; protected set; }
+
+        public ITypeResolver TypeResolver => ConnectionBuilder?.GetTypeResolver();
+        public IPayloadSerializer Serializer => ConnectionBuilder?.GetSerializer();
         public IServiceManager<IServer> Services => _services;
         public event ClientAcceptedHandler ClientAccepted;
-        public event DisconnectHandler ClientDisconnected;
+        public event Connection.DisconnectHandler ClientDisconnected;
         public event GlobalPayloadHandler PayloadReceived;
-
-        public event InternalPayloadDispatchHandler DispatchPayload;
+        public event Connection.InternalPayloadDispatchHandler DispatchPayload;
 
         /// <summary>
         ///     Triggers after a connection has been idle for the specified TimeSpan (<see cref="ReceiveTimeout" />)
@@ -249,7 +245,7 @@ namespace Ace.Networking
         private bool Con_DispatchPayload(IConnection connection, object payload, Type type,
             Action<object> responseSender, int? requestId)
         {
-            bool ret = ProcessPayloadHandlers(connection, payload, type, responseSender, requestId);
+            var ret = ProcessPayloadHandlers(connection, payload, type, responseSender, requestId);
             try
             {
                 PayloadReceived?.Invoke(connection, payload, type);
@@ -260,21 +256,16 @@ namespace Ace.Networking
             }
 
             if (DispatchPayload != null)
-            {
                 foreach (var @delegate in DispatchPayload.GetInvocationList())
-                {
-                    
                     try
                     {
-                        var h = (InternalPayloadDispatchHandler)@delegate;
+                        var h = (Connection.InternalPayloadDispatchHandler) @delegate;
                         ret |= h(connection, payload, type, responseSender, requestId);
                     }
                     catch
                     {
                         //ignored
                     }
-                }
-            }
 
             return ret;
 

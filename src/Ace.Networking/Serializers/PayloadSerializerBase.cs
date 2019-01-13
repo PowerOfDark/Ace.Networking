@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
+using Ace.Networking.Interfaces;
 using Ace.Networking.Threading;
-using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.TypeResolvers;
 
 namespace Ace.Networking.Serializers
@@ -13,13 +10,14 @@ namespace Ace.Networking.Serializers
     {
         public static readonly byte[] NullSerializer = {0x0};
 
-        public abstract byte[] SupportedContentType { get; }
-        public ITypeResolver TypeResolver { get; set; }
-
         public PayloadSerializerBase(ITypeResolver typeResolver)
         {
-            this.TypeResolver = typeResolver;
+            TypeResolver = typeResolver;
         }
+
+        public ITypeResolver TypeResolver { get; set; }
+
+        public abstract byte[] SupportedContentType { get; }
 
         public virtual object Deserialize(byte[] contentType, Stream source, out Type resolvedType)
         {
@@ -35,7 +33,8 @@ namespace Ace.Networking.Serializers
         public virtual void Serialize(object source, Stream destination, out byte[] contentType)
         {
             contentType = SupportedContentType;
-            if(!TypeResolver.TryWrite(destination, source?.GetType() ?? typeof(object))) throw new InvalidOperationException($"no type resolver can handle the specified type");
+            if (!TypeResolver.TryWrite(destination, source?.GetType() ?? typeof(object)))
+                throw new InvalidOperationException($"no type resolver can handle the specified type");
             var l = source as ISerializationListener;
             l?.PreSerialize(this, destination);
             SerializeContent(source, destination);
@@ -54,7 +53,7 @@ namespace Ace.Networking.Serializers
         private bool SequenceEqual(byte[] supportedContentType, byte[] contentType)
         {
             if (supportedContentType.Length != contentType.Length) return false;
-            for (int i = 0; i < supportedContentType.Length; i++)
+            for (var i = 0; i < supportedContentType.Length; i++)
                 if (SupportedContentType[i] != contentType[i])
                     return false;
             return true;

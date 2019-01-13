@@ -1,6 +1,6 @@
 ﻿using System.Net.Security;
 
-namespace Ace.Networking.MicroProtocol.Interfaces
+namespace Ace.Networking.MicroProtocol.SSL
 {
     public interface ISslStreamFactory
     {

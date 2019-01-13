@@ -1,11 +1,6 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using System.Text;
-using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.Structures;
 
 namespace Ace.Networking.TypeResolvers
@@ -27,19 +22,19 @@ namespace Ace.Networking.TypeResolvers
             if (type.IsArray)
             {
                 h = 0xF4;
-                guid = GetRepresentationUtil(typeInfo.BaseType, depth+1);
+                guid = GetRepresentationUtil(typeInfo.BaseType, depth + 1);
             }
 
-           
-            for (int i = 0; i < 16; i++) guid[i] ^= (h = (byte) ((31 * h) + (depth* depth^0b0001100101)));
+
+            for (var i = 0; i < 16; i++) guid[i] ^= h = (byte) (31 * h + ((depth * depth) ^ 0b0001100101));
             if (typeInfo.IsGenericType)
             {
-                int m = 1;
+                var m = 1;
                 foreach (var g in type.GenericTypeArguments)
                 {
                     var tmp = GetRepresentation(g);
-                    for (int i = 0; i < 16; i++)
-                        guid[i] ^= (h = (byte) ((37 * h) + (m ^ 0b101100101011)));
+                    for (var i = 0; i < 16; i++)
+                        guid[i] ^= h = (byte) (37 * h + (m ^ 0b101100101011));
                     m++;
                 }
             }
@@ -54,7 +49,7 @@ namespace Ace.Networking.TypeResolvers
             if (!TypesLookup.TryGetValue(type, out var guid)) return false;
             stream.WriteByte(Signature);
             stream.Write(guid.Bytes, 0, 16);
-            
+
             return true;
         }
 
@@ -67,10 +62,9 @@ namespace Ace.Networking.TypeResolvers
                 return false;*/
             if (stream.ReadByte() != Signature) throw new InvalidDataException("Invalid type resolver signature");
             var buf = new byte[16];
-            int read = stream.Read(buf, 0, 16);
+            var read = stream.Read(buf, 0, 16);
             if (read != 16) return false;
-            return (Types.TryGetValue(new ByteArrayKey(buf), out type));
+            return Types.TryGetValue(new ByteArrayKey(buf), out type);
         }
-
     }
 }

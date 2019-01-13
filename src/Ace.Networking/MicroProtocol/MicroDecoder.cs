@@ -6,6 +6,7 @@ using Ace.Networking.MicroProtocol.Enums;
 using Ace.Networking.MicroProtocol.Headers;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.Structures;
+using Ace.Networking.Serializers;
 
 namespace Ace.Networking.MicroProtocol
 {

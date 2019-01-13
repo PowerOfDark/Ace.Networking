@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Ace.Networking.Handlers;
+using Ace.Networking.Serializers;
 using Ace.Networking.Threading;
-using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.TypeResolvers;
 
 namespace Ace.Networking.Structures
@@ -11,11 +11,6 @@ namespace Ace.Networking.Structures
     public class ConnectionGroup : PayloadHandlerDispatcher, IConnectionGroup
     {
         private readonly HashSet<IConnection> _clients = new HashSet<IConnection>();
-        public IReadOnlyCollection<IConnection> Clients => _clients;
-        public ICommon Host { get; }
-        public ITypeResolver TypeResolver => Host?.TypeResolver;
-        public IPayloadSerializer Serializer => Host?.Serializer;
-        public event Connection.InternalPayloadDispatchHandler DispatchPayload;
 
 
         public ConnectionGroup(ICommon host)
@@ -23,69 +18,20 @@ namespace Ace.Networking.Structures
             Host = host;
         }
 
-        internal void Bind()
-        {
-            Host.DispatchPayload += Host_DispatchPayload;
-            Host.ClientDisconnected += Host_ClientDisconnected;
-        }
-
-        private void Host_ClientDisconnected(IConnection connection, Exception exception)
-        {
-            if (!ContainsClient(connection)) return;
-            OnDisconnected(connection, exception);
-        }
-
-        internal void Unbind()
-        {
-            Host.DispatchPayload -= Host_DispatchPayload;
-            Host.ClientDisconnected -= Host_ClientDisconnected;
-        }
-
-        private bool Host_DispatchPayload(IConnection connection, object payload, Type type, Action<object> responseSender, int? requestId)
-        {
-            if (!ContainsClient(connection)) return false;
-
-            bool ret = ProcessPayloadHandlers(connection, payload, type, responseSender, requestId);
-
-
-            try
-            {
-                PayloadReceived?.Invoke(connection, payload, type);
-            }
-            catch { }
-
-
-            if (DispatchPayload != null)
-            {
-                foreach (var handler in DispatchPayload.GetInvocationList())
-                {
-                    try
-                    {
-                        if (handler is Connection.InternalPayloadDispatchHandler h)
-                            ret |= h.Invoke(connection, payload, type, responseSender, requestId);
-                    }
-                    catch { }
-                }
-            }
-
-            return ret;
-        }
+        public IReadOnlyCollection<IConnection> Clients => _clients;
+        public ICommon Host { get; }
+        public ITypeResolver TypeResolver => Host?.TypeResolver;
+        public IPayloadSerializer Serializer => Host?.Serializer;
+        public event Connection.InternalPayloadDispatchHandler DispatchPayload;
 
         public void AddClient(IConnection client)
         {
             lock (_clients)
             {
-                if (!_clients.Contains(client))
-                {
-                    _clients.Add(client);
-                    //client.PayloadReceived += OnPayloadReceived;
-                    //client.ClientDisconnected += OnDisconnected;
-                }
+                if (!_clients.Contains(client)) _clients.Add(client);
 
                 if (_clients.Count == 1) Bind();
             }
-            
-
         }
 
         public void Close()
@@ -121,9 +67,58 @@ namespace Ace.Networking.Structures
                 new List<Task>(Clients.Count)));
         }
 
-        
+
         public event GlobalPayloadHandler PayloadReceived;
         public event Connection.DisconnectHandler ClientDisconnected;
+
+        internal void Bind()
+        {
+            Host.DispatchPayload += Host_DispatchPayload;
+            Host.ClientDisconnected += Host_ClientDisconnected;
+        }
+
+        private void Host_ClientDisconnected(IConnection connection, Exception exception)
+        {
+            if (!ContainsClient(connection)) return;
+            OnDisconnected(connection, exception);
+        }
+
+        internal void Unbind()
+        {
+            Host.DispatchPayload -= Host_DispatchPayload;
+            Host.ClientDisconnected -= Host_ClientDisconnected;
+        }
+
+        private bool Host_DispatchPayload(IConnection connection, object payload, Type type,
+            Action<object> responseSender, int? requestId)
+        {
+            if (!ContainsClient(connection)) return false;
+
+            var ret = ProcessPayloadHandlers(connection, payload, type, responseSender, requestId);
+
+
+            try
+            {
+                PayloadReceived?.Invoke(connection, payload, type);
+            }
+            catch
+            {
+            }
+
+
+            if (DispatchPayload != null)
+                foreach (var handler in DispatchPayload.GetInvocationList())
+                    try
+                    {
+                        if (handler is Connection.InternalPayloadDispatchHandler h)
+                            ret |= h.Invoke(connection, payload, type, responseSender, requestId);
+                    }
+                    catch
+                    {
+                    }
+
+            return ret;
+        }
 
         protected T DoForEach<T>(Action<IConnection, T> action, T variable = default) where T : class
         {
@@ -166,6 +161,5 @@ namespace Ace.Networking.Structures
             RemoveClient(connection);
             ClientDisconnected?.Invoke(connection, ex);
         }
-
     }
 }

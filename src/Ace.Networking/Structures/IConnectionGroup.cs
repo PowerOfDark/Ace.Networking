@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
+using Ace.Networking.Interfaces;
 
-namespace Ace.Networking.Threading
+namespace Ace.Networking.Structures
 {
     public interface IConnectionGroup : IMulticastDispatcherInterface
     {

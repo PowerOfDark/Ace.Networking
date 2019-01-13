@@ -1,5 +1,4 @@
-﻿using System;
-using Ace.Networking.Memory;
+﻿using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Enums;
 
 namespace Ace.Networking.MicroProtocol.Headers

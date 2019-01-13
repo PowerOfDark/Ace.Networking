@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace Ace.Networking.Threading
+namespace Ace.Networking.Handlers
 {
     public interface IRequestWrapper
     {

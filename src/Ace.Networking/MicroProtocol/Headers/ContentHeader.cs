@@ -1,5 +1,4 @@
-﻿using System;
-using Ace.Networking.Memory;
+﻿using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Enums;
 
 namespace Ace.Networking.MicroProtocol.Headers
@@ -12,7 +11,7 @@ namespace Ace.Networking.MicroProtocol.Headers
 
         public byte[] ContentType { get; set; }
 
-        public ushort ContentTypeLength => checked((ushort)(ContentType?.Length ?? 0));
+        public ushort ContentTypeLength => checked((ushort) (ContentType?.Length ?? 0));
 
         public int[] ContentLength { get; set; }
 
@@ -25,7 +24,7 @@ namespace Ace.Networking.MicroProtocol.Headers
             target.Read(ContentType, 0, contentTypeLength);
             int len = target.ReadInt16();
             ContentLength = new int[len];
-            for (int i = 0; i < len; i++)
+            for (var i = 0; i < len; i++)
                 ContentLength[i] = target.ReadInt32();
 
             return this;
@@ -35,13 +34,12 @@ namespace Ace.Networking.MicroProtocol.Headers
         {
             base.Serialize(target);
 
-            target.Write((short)ContentTypeLength);
+            target.Write((short) ContentTypeLength);
 
             target.Write(ContentType, 0, ContentTypeLength);
-            target.Write(checked((short)ContentLength.Length));
+            target.Write(checked((short) ContentLength.Length));
             foreach (var i in ContentLength)
                 target.Write(i);
-
         }
     }
 }

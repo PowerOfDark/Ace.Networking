@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Runtime.CompilerServices;
-using Ace.Networking.Threading;
 using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Enums;
 using Ace.Networking.MicroProtocol.Headers;
@@ -9,10 +8,11 @@ using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.PacketTypes;
 using Ace.Networking.MicroProtocol.Structures;
 using Ace.Networking.Serializers;
+using Ace.Networking.Structures;
 
 namespace Ace.Networking.MicroProtocol
 {
-    public class MicroEncoder : IPayloadEncoder
+    public class MicroEncoder :IPayloadEncoder
     {
         /// <summary>
         ///     PROTOCOL version
@@ -20,22 +20,22 @@ namespace Ace.Networking.MicroProtocol
         public const byte Version = MicroDecoder.Version;
 
         private readonly IBufferSlice _bufferSlice;
-
-        private RecyclableMemoryStream _contentStream;
-        private RecyclableMemoryStream _headerStream;
         private Stream _bodyStream;
 
         private int _bytesEnqueued;
         private int _bytesLeftToSend;
         private int _bytesTransferred;
+        private int _contentLength;
+        private int[] _contentLengths;
+
+        private readonly RecyclableMemoryStream _contentStream;
         private bool _disposeBodyStream = true;
         private BasicHeader _header;
-        private bool _headerIsSent;
         private bool _headerCreated;
+        private bool _headerIsSent;
         private int _headerLength;
-        private int _contentLength;
+        private readonly RecyclableMemoryStream _headerStream;
         private object _message;
-        private int[] _contentLengths;
         private int _payloadPosition;
 
 
@@ -44,6 +44,7 @@ namespace Ace.Networking.MicroProtocol
             _contentStream = MemoryManager.Instance.GetStream();
             _headerStream = MemoryManager.Instance.GetStream();
         }
+
         /// <summary>
         ///     Initializes a new instance of the <see cref="MicroEncoder" /> class.
         /// </summary>
@@ -53,7 +54,6 @@ namespace Ace.Networking.MicroProtocol
         public MicroEncoder(IPayloadSerializer serializer) : this()
         {
             Serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
-
         }
 
         /// <summary>
@@ -66,7 +66,7 @@ namespace Ace.Networking.MicroProtocol
         /// <exception cref="ArgumentOutOfRangeException">
         ///     bufferSlice; At least the header should fit in the buffer
         /// </exception>
-        public MicroEncoder(IPayloadSerializer serializer, IBufferSlice bufferSlice): this()
+        public MicroEncoder(IPayloadSerializer serializer, IBufferSlice bufferSlice) : this()
         {
             if (bufferSlice == null) throw new ArgumentNullException(nameof(bufferSlice));
             if (bufferSlice.Capacity < 520 - 256 + 2048)
@@ -126,9 +126,11 @@ namespace Ace.Networking.MicroProtocol
                     _headerCreated = true;
                     _bytesLeftToSend = headerLength;
                 }
+
                 if (_headerStream.CurrentBlockCapacity == 0)
                     _headerStream.MoveNext();
-                var toWrite = Math.Min(NetworkingSettings.BufferSize, Math.Min(_headerStream.CurrentBlockCapacity, _bytesLeftToSend));
+                var toWrite = Math.Min(NetworkingSettings.BufferSize,
+                    Math.Min(_headerStream.CurrentBlockCapacity, _bytesLeftToSend));
                 args.SetBuffer(_headerStream.CurrentBlock, _headerStream.CurrentBlockOffset, toWrite);
                 _headerStream.Position += toWrite;
             }
@@ -136,7 +138,8 @@ namespace Ace.Networking.MicroProtocol
             {
                 if (_contentStream.CurrentBlockCapacity == 0)
                     _contentStream.MoveNext();
-                var toWrite = Math.Min(NetworkingSettings.BufferSize, Math.Min(_contentStream.CurrentBlockCapacity, _bytesLeftToSend));
+                var toWrite = Math.Min(NetworkingSettings.BufferSize,
+                    Math.Min(_contentStream.CurrentBlockCapacity, _bytesLeftToSend));
                 args.SetBuffer(_contentStream.CurrentBlock, _contentStream.CurrentBlockOffset, toWrite);
                 _contentStream.Position += toWrite;
             }
@@ -156,15 +159,12 @@ namespace Ace.Networking.MicroProtocol
             _bytesTransferred += bytesTransferred;
             _bytesLeftToSend -= bytesTransferred;
             if (!_headerIsSent)
-            {
-                //_headerLength -= bytesTransferred;
                 if (_bytesLeftToSend <= 0)
                 {
                     _headerIsSent = true;
                     _bytesTransferred = 0;
                     _bytesLeftToSend = _contentLength;
                 }
-            }
 
             //_bytesTransferred = bytesTransferred;
             if (_bytesLeftToSend == 0) Clear();
@@ -209,42 +209,37 @@ namespace Ace.Networking.MicroProtocol
             contentLength = 0;
             if (_header is ContentHeader content)
             {
-                if (_message is Stream)
+                if (_message is Stream) throw new NotSupportedException();
+
+                if (_message is byte[] buf) throw new NotSupportedException();
+
+                _bodyStream = _contentStream;
+                var pos = _bodyStream.Position;
+                if (_message is IDynamicPayload dp)
                 {
-                    throw new NotSupportedException();
-                }
-                else if (_message is byte[] buf)
-                {
-                    throw new NotSupportedException();
+                    content.PacketFlag |= PacketFlag.MultiContent;
+                    var obj = dp.Deconstruct();
+                    content.ContentLength = new int[obj.Length];
+                    byte[] ct = null;
+                    for (var i = 0; i < obj.Length; i++)
+                    {
+                        var cur = _bodyStream.Position;
+                        Serializer.Serialize(obj[i], _bodyStream, out ct);
+                        content.ContentLength[i] = checked((int) (_bodyStream.Position - cur));
+                    }
+
+                    content.ContentType = ct;
                 }
                 else
                 {
-                    _bodyStream = _contentStream;
-                    long pos = _bodyStream.Position;
-                    if (_message is IDynamicPayload dp)
-                    {
-                        content.PacketFlag |= PacketFlag.MultiContent;
-                        var obj = dp.Deconstruct();
-                        content.ContentLength = new int[obj.Length];
-                        byte[] ct = null;
-                        for (int i = 0; i < obj.Length; i++)
-                        {
-                            long cur = _bodyStream.Position;
-                            Serializer.Serialize(obj[i], _bodyStream, out ct);
-                            content.ContentLength[i] = checked((int)(_bodyStream.Position - cur));
-                        }
-                        content.ContentType = ct;
-                    }
-                    else
-                    {
-                        byte[] contentType = null;
-                        Serializer.Serialize(_message, _bodyStream, out contentType);
-                        content.ContentType = contentType;
-                        content.ContentLength = new int[1] { checked((int)(_bodyStream.Position - pos)) };
-                    }
-                    _bodyStream.Position = pos;
-                    contentLength = checked((int)(_bodyStream.Length - _bodyStream.Position));
+                    byte[] contentType = null;
+                    Serializer.Serialize(_message, _bodyStream, out contentType);
+                    content.ContentType = contentType;
+                    content.ContentLength = new int[1] {checked((int) (_bodyStream.Position - pos))};
                 }
+
+                _bodyStream.Position = pos;
+                contentLength = checked((int) (_bodyStream.Length - _bodyStream.Position));
 
                 if (contentLength == 0)
                     content.PacketFlag |= PacketFlag.NoContent;
@@ -265,7 +260,7 @@ namespace Ace.Networking.MicroProtocol
             _headerStream.Position = sizeof(short);
             _headerStream.Write(Version);
             _header.Serialize(_headerStream);
-            short len = (short)_headerStream.Position;
+            var len = (short) _headerStream.Position;
             if (_headerStream.Position > ushort.MaxValue)
                 throw new InvalidDataException("Invalid header");
             _headerStream.Position = 0;
@@ -273,6 +268,5 @@ namespace Ace.Networking.MicroProtocol
 
             return len;
         }
-
     }
 }

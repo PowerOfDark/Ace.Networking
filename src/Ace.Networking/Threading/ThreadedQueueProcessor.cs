@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using Ace.Networking.Threading;
 
 namespace Ace.Networking.Threading
 {
@@ -24,13 +23,13 @@ namespace Ace.Networking.Threading
         private Timer _timer;
         protected int BoostPeak;
         protected volatile int ClientCount;
+        protected int LastBoostSize;
         protected long LastBoostTick;
         protected long LastKillTick;
         protected long LastStepdownBarrierTick;
         protected long LastStepdownTick;
 
         protected int LastTickQueueSize = 0;
-        protected int LastBoostSize = 0;
         protected long LastWorkTicks;
         protected long MonitorTick;
         protected ConcurrentQueue<ThreadedQueueItem<TItem>>[] SendQueues;
@@ -73,6 +72,7 @@ namespace Ace.Networking.Threading
                 SendQueues[i] = new ConcurrentQueue<ThreadedQueueItem<TItem>>();
                 ThreadList.Add(null);
             }
+
             TrySpawnNewThreads(Parameters.MinThreads);
 
             if (Parameters.MaxThreads == Parameters.MinThreads)
@@ -130,7 +130,7 @@ namespace Ace.Networking.Threading
             if (cc >= BoostPeak + Parameters.BoostBarrier &&
                 MonitorTick - LastBoostTick >= Parameters.BoostCooldownTicks)
             {
-                target += (LastBoostSize+=1);
+                target += LastBoostSize += 1;
                 BoostPeak = cc - Parameters.BoostBarrier;
             }
 

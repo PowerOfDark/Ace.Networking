@@ -1,4 +1,4 @@
-﻿namespace Ace.Networking
+﻿namespace Ace.Networking.Helpers
 {
     public static class BitConverter2
     {

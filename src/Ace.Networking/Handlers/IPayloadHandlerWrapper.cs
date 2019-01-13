@@ -1,7 +1,7 @@
 ﻿using System;
 using Ace.Networking.Threading;
 
-namespace Ace.Networking.MicroProtocol.Interfaces
+namespace Ace.Networking.Handlers
 {
     public interface IPayloadHandlerWrapper
     {

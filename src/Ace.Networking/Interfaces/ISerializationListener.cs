@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
-using Ace.Networking.MicroProtocol.Interfaces;
+﻿using System.IO;
+using Ace.Networking.Serializers;
 
-namespace Ace.Networking.Threading
+namespace Ace.Networking.Interfaces
 {
     public interface ISerializationListener
     {

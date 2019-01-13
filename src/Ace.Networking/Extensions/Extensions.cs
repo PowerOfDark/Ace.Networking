@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading;
 
 namespace Ace.Networking.Extensions
@@ -85,6 +84,5 @@ namespace Ace.Networking.Extensions
         {
             return new CancellationTokenSource(ts).Token;
         }
-
     }
 }

@@ -10,17 +10,18 @@ using System.Threading;
 using System.Threading.Tasks;
 using Ace.Networking.Extensions;
 using Ace.Networking.Handlers;
-using Ace.Networking.Threading;
+using Ace.Networking.MicroProtocol;
 using Ace.Networking.MicroProtocol.Enums;
 using Ace.Networking.MicroProtocol.Headers;
-using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.MicroProtocol.PacketTypes;
 using Ace.Networking.MicroProtocol.SSL;
 using Ace.Networking.MicroProtocol.Structures;
+using Ace.Networking.Serializers;
 using Ace.Networking.Services;
+using Ace.Networking.Structures;
 using Ace.Networking.Threading;
+using Ace.Networking.Threading.Workers;
 using Ace.Networking.TypeResolvers;
-using static Ace.Networking.MicroProtocol.Headers.RawDataHeader;
 
 namespace Ace.Networking
 {
@@ -43,8 +44,8 @@ namespace Ace.Networking
         internal readonly IPayloadDecoder _decoder;
         internal readonly IPayloadEncoder _encoder;
 
-        internal readonly ConcurrentDictionary<int, LinkedList<RawDataHandler>> _rawDataHandlers =
-            new ConcurrentDictionary<int, LinkedList<RawDataHandler>>();
+        internal readonly ConcurrentDictionary<int, LinkedList<RawDataHeader.RawDataHandler>> _rawDataHandlers =
+            new ConcurrentDictionary<int, LinkedList<RawDataHeader.RawDataHandler>>();
 
         internal readonly LinkedList<TaskCompletionSource<object>> _receiveFilters =
             new LinkedList<TaskCompletionSource<object>>();
@@ -89,8 +90,6 @@ namespace Ace.Networking
 
         private Stream _stream;
         private SocketBuffer _writeBuffer;
-
-        public event InternalPayloadDispatchHandler DispatchPayload;
 
         private Connection(IPayloadEncoder encoder, IPayloadDecoder decoder)
         {
@@ -147,6 +146,8 @@ namespace Ace.Networking
         }
 
         public ISslCertificatePair SslCertificates { get; private set; }
+
+        public event InternalPayloadDispatchHandler DispatchPayload;
 
         public IPayloadSerializer Serializer => _encoder?.Serializer ?? _decoder?.Serializer;
         public ITypeResolver TypeResolver => Serializer.TypeResolver;
@@ -265,6 +266,59 @@ namespace Ace.Networking
             //Connected = false;
         }
 
+        /// <summary>
+        ///     Catch-all for all payload received.
+        ///     This event should be used in a receive-only fashion.
+        /// </summary>
+        public event GlobalPayloadHandler PayloadReceived;
+
+        public event GlobalPayloadHandler PayloadSent;
+        public event RawDataHeader.RawDataHandler RawDataReceived;
+
+
+        public void OnRaw(int bufId, RawDataHeader.RawDataHandler handler)
+        {
+            if (!_rawDataHandlers.TryGetValue(bufId, out var list))
+                _rawDataHandlers.TryAdd(bufId, list = new LinkedList<RawDataHeader.RawDataHandler>());
+            lock (list)
+            {
+                list.AddLast(handler);
+            }
+        }
+
+        public bool OffRaw(int bufId, RawDataHeader.RawDataHandler handler)
+        {
+            if (!_rawDataHandlers.TryGetValue(bufId, out var list)) return false;
+            bool ret;
+            lock (list)
+            {
+                ret = list.Remove(handler);
+            }
+
+            return ret;
+        }
+
+        /// <summary>
+        ///     Returns a newly created, unique buffer ID for raw data transfer.
+        /// </summary>
+        /// <returns>Buffer ID</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int CreateNewRawDataBuffer()
+        {
+            return Interlocked.Increment(ref _lastRawDataBufferId);
+        }
+
+        /// <summary>
+        ///     Removes all RawDataHandlers for the specified buffer ID.
+        /// </summary>
+        /// <param name="bufId"></param>
+        /// <returns>Whether at least one handler has been removed.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool DestroyRawDataBuffer(int bufId)
+        {
+            return _rawDataHandlers.TryRemove(bufId, out _);
+        }
+
         public TcpClient Client { get; private set; }
 
         ISslCertificatePair ISslContainer.SslCertificates
@@ -272,15 +326,6 @@ namespace Ace.Networking
             get => SslCertificates;
             set => SslCertificates = value;
         }
-
-        /// <summary>
-        ///     Catch-all for all payload received.
-        ///     This event should be used in a receive-only fashion.
-        /// </summary>
-        public event GlobalPayloadHandler PayloadReceived;
-  
-        public event GlobalPayloadHandler PayloadSent;
-        public event RawDataHandler RawDataReceived;
 
         public override int GetHashCode()
         {
@@ -312,7 +357,7 @@ namespace Ace.Networking
         private void OnPayloadReceived(BasicHeader header, object obj, Type type)
         {
             int? unboxedRequest = null;
-            bool handled = false;
+            var handled = false;
 
             if (header.PacketType == PacketType.Trackable)
                 if (header is TrackableHeader tHeader)
@@ -345,14 +390,9 @@ namespace Ace.Networking
                 if (o == null) return;
                 handled = true;
                 if (unboxedRequest.HasValue)
-                {
-                    //unboxedRequest = null;
                     EnqueueSendResponse(((TrackableHeader) header).RequestId, o);
-                }
                 else
-                {
                     EnqueueSend(o);
-                }
             }
 
             if (_receiveTypeFilters.Count > 0)
@@ -402,13 +442,9 @@ namespace Ace.Networking
             try
             {
                 if (DispatchPayload != null)
-                {
                     foreach (var handler in DispatchPayload.GetInvocationList())
-                    {
                         if (handler is InternalPayloadDispatchHandler h)
                             handled |= h.Invoke(this, obj, type, SendResponse, unboxedRequest);
-                    }
-                }
             }
             catch
             {
@@ -441,7 +477,6 @@ namespace Ace.Networking
 
             if (_rawDataHandlers.Count > 0)
                 if (_rawDataHandlers.TryGetValue(bufferId, out var list))
-                {
                     lock (list)
                     {
                         foreach (var handler in list)
@@ -450,7 +485,6 @@ namespace Ace.Networking
                             stream.Seek(0, SeekOrigin.Begin);
                         }
                     }
-                }
 
             SendResponse(RawDataReceived?.Invoke(bufferId, seq, stream));
             stream.Seek(0, SeekOrigin.Begin);
@@ -623,7 +657,7 @@ namespace Ace.Networking
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void PushSendSync(TaskCompletionSource<object> tcs)
         {
-            SendSync(tcs.Task.AsyncState as IPreparedPacket,  tcs);
+            SendSync(tcs.Task.AsyncState as IPreparedPacket, tcs);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -872,50 +906,6 @@ namespace Ace.Networking
             });
 
             return t;
-        }
-
-
-        public void OnRaw(int bufId, RawDataHandler handler)
-        {
-            if (!_rawDataHandlers.TryGetValue(bufId, out var list))
-                _rawDataHandlers.TryAdd(bufId, list = new LinkedList<RawDataHandler>());
-            lock (list)
-            {
-                list.AddLast(handler);
-            }
-        }
-
-        public bool OffRaw(int bufId, RawDataHandler handler)
-        {
-            if (!_rawDataHandlers.TryGetValue(bufId, out var list)) return false;
-            bool ret;
-            lock (list)
-            {
-                ret = list.Remove(handler);
-            }
-
-            return ret;
-        }
-
-        /// <summary>
-        ///     Returns a newly created, unique buffer ID for raw data transfer.
-        /// </summary>
-        /// <returns>Buffer ID</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int CreateNewRawDataBuffer()
-        {
-            return Interlocked.Increment(ref _lastRawDataBufferId);
-        }
-
-        /// <summary>
-        ///     Removes all RawDataHandlers for the specified buffer ID.
-        /// </summary>
-        /// <param name="bufId"></param>
-        /// <returns>Whether at least one handler has been removed.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool DestroyRawDataBuffer(int bufId)
-        {
-            return _rawDataHandlers.TryRemove(bufId, out _);
         }
 
         #region IDisposable Support

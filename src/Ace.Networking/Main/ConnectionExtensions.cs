@@ -8,7 +8,6 @@ namespace Ace.Networking
 {
     public static class ConnectionExtensions
     {
-
         public static IConnectionBuilder UseServices(this IConnectionBuilder b, Func<IServicesBuilder<IConnection>, IServicesBuilder<IConnection>> config)
         {
             return b.UseServices<ServicesBuilder<IConnection>>(config);

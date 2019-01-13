@@ -1,4 +1,4 @@
-﻿namespace Ace.Networking.Threading
+﻿namespace Ace.Networking.Threading.Workers
 {
     public class HandleReceiveWorker : IWorker<ReceiveMessageQueueItem>
     {

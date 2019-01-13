@@ -1,10 +1,10 @@
 ﻿using Ace.Networking.Services;
 
-namespace Ace.Networking.Threading
+namespace Ace.Networking
 {
     public interface IServer : ICommon, IServiceContainer<IServer>
     {
         event TcpServer.ClientAcceptedHandler ClientAccepted;
-        event Connection.InternalPayloadDispatchHandler DispatchPayload;
+        //event Connection.InternalPayloadDispatchHandler DispatchPayload;
     }
 }

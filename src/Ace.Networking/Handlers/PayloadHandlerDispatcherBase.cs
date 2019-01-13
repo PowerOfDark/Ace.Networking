@@ -3,13 +3,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Ace.Networking.Extensions;
-using Ace.Networking.Threading;
 using Ace.Networking.MicroProtocol.Interfaces;
 
 namespace Ace.Networking.Handlers
 {
-
-
     public abstract class PayloadHandlerDispatcherBase
     {
         protected ConcurrentDictionary<Type, LinkedList<RequestHandler>> RequestHandlers =

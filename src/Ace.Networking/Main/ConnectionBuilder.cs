@@ -2,8 +2,8 @@
 using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
-using Ace.Networking.Threading;
-using Ace.Networking.MicroProtocol.Interfaces;
+using Ace.Networking.MicroProtocol.SSL;
+using Ace.Networking.Serializers;
 using Ace.Networking.Services;
 using Ace.Networking.Structures;
 using Ace.Networking.TypeResolvers;
@@ -30,7 +30,8 @@ namespace Ace.Networking
             return this;
         }
 
-        public IConnectionBuilder UseServices<TBuilder>(Func<TBuilder, IServicesBuilder<IConnection>> config) where TBuilder : IServicesBuilder<IConnection>
+        public IConnectionBuilder UseServices<TBuilder>(Func<TBuilder, IServicesBuilder<IConnection>> config)
+            where TBuilder : IServicesBuilder<IConnection>
         {
             var builder = Activator.CreateInstance<TBuilder>();
             _services = config.Invoke(builder);
@@ -54,14 +55,14 @@ namespace Ace.Networking
             X509Certificate2 certificate, SslProtocols protocols)
         {
             if (_config == null) _config = new ProtocolConfiguration();
-            this.UseSsl(_config.GetClientSslFactory(targetCommonName, certificate, protocols));
+            UseSsl(_config.GetClientSslFactory(targetCommonName, certificate, protocols));
             return this;
         }
 
         public IConnectionBuilder UseServerSsl(X509Certificate2 certificate, bool useClient, SslProtocols protocols)
         {
             if (_config == null) _config = new ProtocolConfiguration();
-            this.UseSsl(_config.GetServerSslFactory(certificate, useClient, protocols));
+            UseSsl(_config.GetServerSslFactory(certificate, useClient, protocols));
             return this;
         }
 
@@ -69,7 +70,7 @@ namespace Ace.Networking
         {
             var cfg = _config ?? new ProtocolConfiguration();
             var services = _services?.Build() ?? ServicesManager<IConnection>.Empty;
-            IConnectionData data = _data ?? new ConnectionData();
+            var data = _data ?? new ConnectionData();
             return new Connection(client, cfg,
                 services, _sslFactory,
                 data, _dispatcher);

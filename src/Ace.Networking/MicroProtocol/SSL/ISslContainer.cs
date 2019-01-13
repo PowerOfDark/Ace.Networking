@@ -1,6 +1,6 @@
 ﻿using System.Net.Sockets;
 
-namespace Ace.Networking.MicroProtocol.Interfaces
+namespace Ace.Networking.MicroProtocol.SSL
 {
     public interface ISslContainer
     {

@@ -1,8 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using Ace.Networking.Handlers;
 
-namespace Ace.Networking.Threading
+namespace Ace.Networking.Interfaces
 {
     public interface IConnectionDispatcherInterface
     {
@@ -18,6 +17,7 @@ namespace Ace.Networking.Threading
 
 
         void OnRequest<T>(RequestHandler handler);
+
         void OnRequest(Type type, RequestHandler handler);
         //IReadOnlyCollection<RequestHandler> OnRequest(Type type);
         //IReadOnlyCollection<RequestHandler> OnRequest<T>();
@@ -26,6 +26,5 @@ namespace Ace.Networking.Threading
         bool OffRequest(Type type);
         bool OffRequest(Type type, RequestHandler handler);
         bool OffRequest<T>();
-
     }
 }

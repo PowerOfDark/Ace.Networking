@@ -1,14 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
-using Ace.Networking.MicroProtocol.Interfaces;
+using Ace.Networking.TypeResolvers;
 using ProtoBuf;
 
-namespace Ace.Networking.Serializers.Protobuf
+namespace Ace.Networking.Serializers
 {
     public class ProtobufSerializer : PayloadSerializerBase
     {
+        public ProtobufSerializer(ITypeResolver typeResolver) : base(typeResolver)
+        {
+        }
+
         public override byte[] SupportedContentType => new byte[] {0x13};
 
         public override IPayloadSerializer Clone()
@@ -24,10 +26,6 @@ namespace Ace.Networking.Serializers.Protobuf
         public override void SerializeContent(object source, Stream destination)
         {
             Serializer.NonGeneric.Serialize(destination, source);
-        }
-
-        public ProtobufSerializer(ITypeResolver typeResolver) : base(typeResolver)
-        {
         }
     }
 }

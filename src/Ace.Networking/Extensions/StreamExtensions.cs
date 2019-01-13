@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
+﻿using System.IO;
 
 namespace Ace.Networking.Extensions
 {
@@ -14,6 +11,5 @@ namespace Ace.Networking.Extensions
             stream.Read(buf, 0, buf.Length);
             return buf;
         }
-
     }
 }
