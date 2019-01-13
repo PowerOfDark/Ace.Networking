@@ -74,15 +74,24 @@ namespace Ace.Networking.Helpers
             return res;
         }
 
+        private static ConstructorInfo[] _getConstructors(Type t, BindingFlags flags)
+        {
+#if CORE13
+            return t.GetConstructors(flags);
+#else
+            return t.GetTypeInfo().GetConstructors();
+#endif
+        }
+
         private static IEnumerable<Type> GetChildren(Type t)
         {
-            var ctor = t.GetTypeInfo().GetConstructors(BindingFlags.Public | BindingFlags.Instance).Single();
+            var ctor = _getConstructors(t, BindingFlags.Public | BindingFlags.Instance).Single();
             return ctor.GetParameters().Select(p => p.ParameterType);
         }
 
         private static T Construct<T>(Type type, IDictionary<Type, T> map) where T : class
         {
-            var ctor = type.GetTypeInfo().GetConstructors(BindingFlags.Public | BindingFlags.Instance).Single();
+            var ctor = _getConstructors(type, BindingFlags.Public | BindingFlags.Instance).Single();
             var parameters = ctor.GetParameters();
             var obj = new object[parameters.Length];
             var i = 0;
