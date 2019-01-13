@@ -22,5 +22,11 @@ namespace Ace.Networking.Helpers
 
             return tcs;
         }
+
+        public static CancellationToken AsCancellationToken(this TimeSpan time)
+        {
+            var cts = new CancellationTokenSource(time);
+            return cts.Token;
+        }
     }
 }
