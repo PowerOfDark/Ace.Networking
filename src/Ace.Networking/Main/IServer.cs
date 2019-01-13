@@ -1,6 +1,6 @@
 ﻿using Ace.Networking.Services;
 
-namespace Ace.Networking.Interfaces
+namespace Ace.Networking.Threading
 {
     public interface IServer : ICommon, IServiceContainer<IServer>
     {

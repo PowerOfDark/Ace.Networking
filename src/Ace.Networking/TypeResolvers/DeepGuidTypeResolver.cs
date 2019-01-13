@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using System.Text;
 using Ace.Networking.Structures;
 
 namespace Ace.Networking.TypeResolvers
@@ -21,6 +19,7 @@ namespace Ace.Networking.TypeResolvers
                     RegisterType(generic);
                 type = type.GetGenericTypeDefinition();
             }
+
             base.RegisterType(type);
         }
 
@@ -42,7 +41,6 @@ namespace Ace.Networking.TypeResolvers
             }
 
 
-
             ByteArrayKey mainGuid;
 
             Type[] children = null;
@@ -51,7 +49,7 @@ namespace Ace.Networking.TypeResolvers
                 if (!TypesLookup.TryGetValue(type.GetGenericTypeDefinition(), out mainGuid))
                     return false;
                 children = type.GetGenericArguments();
-                generics += checked((byte)children.Length);
+                generics += checked((byte) children.Length);
             }
             else
             {
@@ -61,21 +59,17 @@ namespace Ace.Networking.TypeResolvers
 
 
             if (children != null)
-            {
                 foreach (var child in children)
                     if (!SerializeComplex(null, child))
                         return false;
-            }
             stream.WriteByte(arrayRank);
             stream.WriteByte(generics);
             stream.Write(mainGuid.Bytes, 0, mainGuid.Bytes.Length);
 
             if (children != null)
-            {
                 foreach (var child in children)
                     if (!SerializeComplex(stream, child))
                         throw new InvalidOperationException();
-            }
 
             return true;
         }
@@ -84,7 +78,7 @@ namespace Ace.Networking.TypeResolvers
         {
             byte arrayRank = 0;
             byte generics = 0;
-            while(type.IsArray)
+            while (type.IsArray)
             {
                 arrayRank++;
                 type = type.GetElementType();
@@ -98,13 +92,14 @@ namespace Ace.Networking.TypeResolvers
                 if (!TypesLookup.TryGetValue(type.GetGenericTypeDefinition(), out mainGuid))
                     return false;
                 children = type.GetGenericArguments();
-                generics += checked((byte)children.Length);
+                generics += checked((byte) children.Length);
             }
             else
             {
                 if (!TypesLookup.TryGetValue(type, out mainGuid))
                     return false;
             }
+
             if (stream != null)
             {
                 stream.WriteByte(arrayRank);
@@ -113,11 +108,9 @@ namespace Ace.Networking.TypeResolvers
             }
 
             if (children != null)
-            {
                 foreach (var child in children)
                     if (!SerializeComplex(stream, child))
                         return false;
-            }
 
             return true;
         }
@@ -125,13 +118,13 @@ namespace Ace.Networking.TypeResolvers
         public bool DeserializeComplex(Stream stream, out Type type)
         {
             type = null;
-            int arrayRank = stream.ReadByte();
+            var arrayRank = stream.ReadByte();
             if (arrayRank == -1) return false;
-            int generics = stream.ReadByte();
+            var generics = stream.ReadByte();
             if (generics == -1) return false;
 
-            byte[] chunk = new byte[16];
-            int read = stream.Read(chunk, 0, chunk.Length);
+            var chunk = new byte[16];
+            var read = stream.Read(chunk, 0, chunk.Length);
             if (read != chunk.Length) return false;
 
             if (!Types.TryGetValue(new ByteArrayKey(chunk), out type))
@@ -139,13 +132,14 @@ namespace Ace.Networking.TypeResolvers
 
             if (type.GetTypeInfo().IsGenericTypeDefinition)
             {
-                Type[] children = new Type[generics];
-                for (int i = 0; i < generics; i++)
+                var children = new Type[generics];
+                for (var i = 0; i < generics; i++)
                 {
                     if (!DeserializeComplex(stream, out var child))
                         return false;
                     children[i] = child;
                 }
+
                 type = type.MakeGenericType(children);
             }
 
@@ -162,7 +156,7 @@ namespace Ace.Networking.TypeResolvers
         {
             if (!stream.CanWrite)
                 throw new ArgumentException(nameof(stream));
-            
+
             stream.WriteByte(Signature);
 
             return SerializeComplexRoot(stream, type);

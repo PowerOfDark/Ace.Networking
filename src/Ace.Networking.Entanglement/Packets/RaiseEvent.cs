@@ -4,7 +4,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using Ace.Networking.Extensions;
-using Ace.Networking.Interfaces;
+using Ace.Networking.Threading;
 using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Interfaces;
 using ProtoBuf;

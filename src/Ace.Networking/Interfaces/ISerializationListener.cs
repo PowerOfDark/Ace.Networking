@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using Ace.Networking.MicroProtocol.Interfaces;
 
-namespace Ace.Networking.Interfaces
+namespace Ace.Networking.Threading
 {
     public interface ISerializationListener
     {

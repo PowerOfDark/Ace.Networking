@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
-using Ace.Networking.Interfaces;
 using Ace.Networking.MicroProtocol.Interfaces;
+using Ace.Networking.Threading;
 
 namespace Ace.Networking.Handlers
 {

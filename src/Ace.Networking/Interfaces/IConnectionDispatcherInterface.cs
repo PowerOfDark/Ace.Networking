@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Ace.Networking.Handlers;
 
-namespace Ace.Networking.Interfaces
+namespace Ace.Networking.Threading
 {
     public interface IConnectionDispatcherInterface
     {

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Runtime.CompilerServices;
-using Ace.Networking.Interfaces;
+using Ace.Networking.Threading;
 using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Enums;
 using Ace.Networking.MicroProtocol.Headers;

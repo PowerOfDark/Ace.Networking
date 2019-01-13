@@ -1,5 +1,5 @@
 ﻿using System.Threading.Tasks;
-using Ace.Networking.Interfaces;
+using Ace.Networking.Threading;
 
 namespace Ace.Networking.Handlers
 {

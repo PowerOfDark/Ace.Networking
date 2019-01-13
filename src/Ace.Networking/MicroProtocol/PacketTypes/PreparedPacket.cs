@@ -1,5 +1,4 @@
 ﻿using Ace.Networking.MicroProtocol.Headers;
-using Ace.Networking.MicroProtocol.Interfaces;
 
 namespace Ace.Networking.MicroProtocol.PacketTypes
 {

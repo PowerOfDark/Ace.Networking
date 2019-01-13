@@ -1,6 +1,6 @@
 ﻿using System;
 using Ace.Networking.Entanglement.Services;
-using Ace.Networking.Interfaces;
+using Ace.Networking.Threading;
 using Ace.Networking.Services;
 
 namespace Ace.Networking.Entanglement.Extensions

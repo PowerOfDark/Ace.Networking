@@ -1,4 +1,4 @@
-﻿namespace Ace.Networking.Interfaces
+﻿namespace Ace.Networking.Structures
 {
     public interface IBufferSlice
     {

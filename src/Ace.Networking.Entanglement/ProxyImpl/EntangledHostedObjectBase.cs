@@ -9,7 +9,7 @@ using Ace.Networking.Entanglement.Extensions;
 using Ace.Networking.Entanglement.Packets;
 using Ace.Networking.Entanglement.Reflection;
 using Ace.Networking.Entanglement.Structures;
-using Ace.Networking.Interfaces;
+using Ace.Networking.Threading;
 using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Microsoft.CSharp.RuntimeBinder;

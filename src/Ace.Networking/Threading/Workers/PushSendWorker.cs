@@ -1,6 +1,4 @@
-﻿using Ace.Networking.Interfaces;
-
-namespace Ace.Networking.Threading
+﻿namespace Ace.Networking.Threading
 {
     public class PushSendWorker : IWorker<SendMessageQueueItem>
     {

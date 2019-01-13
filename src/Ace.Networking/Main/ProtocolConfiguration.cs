@@ -16,8 +16,15 @@ namespace Ace.Networking
 {
     public class ProtocolConfiguration
     {
-        public static readonly Type[] Primitives = { typeof(object), typeof(Stream), typeof(byte), typeof(int), typeof(uint), typeof(long), typeof(ulong), typeof(bool), typeof(sbyte), typeof(DateTime), typeof(void), typeof(short), typeof(ushort), typeof(double), typeof(float), typeof(List<>), typeof(Dictionary<,>)};
-        public static Lazy<ProtocolConfiguration> Instance = new Lazy<ProtocolConfiguration>(() => new ProtocolConfiguration());
+        public static readonly Type[] Primitives =
+        {
+            typeof(object), typeof(Stream), typeof(byte), typeof(int), typeof(uint), typeof(long), typeof(ulong),
+            typeof(bool), typeof(sbyte), typeof(DateTime), typeof(void), typeof(short), typeof(ushort), typeof(double),
+            typeof(float), typeof(List<>), typeof(Dictionary<,>)
+        };
+
+        public static Lazy<ProtocolConfiguration> Instance =
+            new Lazy<ProtocolConfiguration>(() => new ProtocolConfiguration());
 
 
         protected volatile bool IsInitialized;
@@ -37,7 +44,7 @@ namespace Ace.Networking
         public ProtocolConfiguration()
         {
             Serializer = new ProtobufSerializer(NetworkingSettings.DefaultTypeResolver);
-            
+
             PayloadEncoder = new MicroEncoder(Serializer.Clone());
             PayloadDecoder = new MicroDecoder(Serializer.Clone());
             CustomIncomingMessageQueue = GlobalIncomingMessageQueue.Instance;
@@ -66,7 +73,6 @@ namespace Ace.Networking
             TypeResolver.RegisterAssembly(typeof(Connection).GetTypeInfo().Assembly);
             foreach (var primitive in Primitives)
                 TypeResolver.RegisterType(primitive);
-
         }
 
         public virtual ClientSslStreamFactory GetClientSslFactory(string targetCommonName = "",
@@ -75,7 +81,8 @@ namespace Ace.Networking
             return new ClientSslStreamFactory(targetCommonName, certificate, protocols);
         }
 
-        public virtual ServerSslStreamFactory GetServerSslFactory(X509Certificate2 certificate = null, bool useClient = true, SslProtocols protocols = SslProtocols.Tls12)
+        public virtual ServerSslStreamFactory GetServerSslFactory(X509Certificate2 certificate = null,
+            bool useClient = true, SslProtocols protocols = SslProtocols.Tls12)
         {
             return new ServerSslStreamFactory(certificate, useClient, protocols);
         }

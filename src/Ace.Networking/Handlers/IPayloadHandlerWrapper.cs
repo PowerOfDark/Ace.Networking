@@ -1,5 +1,5 @@
 ﻿using System;
-using Ace.Networking.Interfaces;
+using Ace.Networking.Threading;
 
 namespace Ace.Networking.MicroProtocol.Interfaces
 {

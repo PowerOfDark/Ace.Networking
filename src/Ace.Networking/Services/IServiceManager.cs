@@ -1,4 +1,4 @@
-﻿using Ace.Networking.Interfaces;
+﻿using Ace.Networking.Threading;
 
 namespace Ace.Networking.Services
 {

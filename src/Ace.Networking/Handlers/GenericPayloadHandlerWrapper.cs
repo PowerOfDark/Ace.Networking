@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
-using Ace.Networking.Interfaces;
+using Ace.Networking.Threading;
 using Ace.Networking.MicroProtocol.Interfaces;
 
 namespace Ace.Networking.Handlers

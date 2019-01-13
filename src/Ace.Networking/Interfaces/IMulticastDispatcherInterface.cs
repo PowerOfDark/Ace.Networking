@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace Ace.Networking.Interfaces
+namespace Ace.Networking.Threading
 {
     public interface IMulticastDispatcherInterface : ICommon
     {

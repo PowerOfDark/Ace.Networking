@@ -1,7 +1,8 @@
 ﻿using Ace.Networking.Handlers;
 using Ace.Networking.MicroProtocol.Interfaces;
+using Ace.Networking.TypeResolvers;
 
-namespace Ace.Networking.Interfaces
+namespace Ace.Networking.Threading
 {
     public interface ICommon : IConnectionDispatcherInterface, INotifyClientDisconnected
     {

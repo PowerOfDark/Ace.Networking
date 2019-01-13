@@ -1,15 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
-
-namespace Ace.Networking.Memory
+﻿namespace Ace.Networking.Memory
 {
     public class MemoryManager
     {
         private static RecyclableMemoryStreamManager _instance;
-        private static object _lock = new object();
-        private static volatile bool _created = false;
+        private static readonly object _lock = new object();
+        private static volatile bool _created;
 
 
         public static RecyclableMemoryStreamManager Instance
@@ -27,7 +22,5 @@ namespace Ace.Networking.Memory
                 return _instance;
             }
         }
-
-        
     }
 }

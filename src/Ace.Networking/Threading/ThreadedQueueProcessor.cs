@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using Ace.Networking.Interfaces;
+using Ace.Networking.Threading;
 
 namespace Ace.Networking.Threading
 {

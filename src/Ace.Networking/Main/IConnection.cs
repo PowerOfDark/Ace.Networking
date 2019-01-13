@@ -4,7 +4,7 @@ using Ace.Networking.MicroProtocol.Headers;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.Services;
 
-namespace Ace.Networking.Interfaces
+namespace Ace.Networking.Threading
 {
     public interface IConnection : IConnectionInterface, IServiceContainer<IConnection>
     {

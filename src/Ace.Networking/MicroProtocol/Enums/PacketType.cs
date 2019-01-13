@@ -8,6 +8,6 @@ namespace Ace.Networking.MicroProtocol.Enums
         Unknown = 0,
         ContentPacket,
         RawData,
-        Trackable,
+        Trackable
     }
 }

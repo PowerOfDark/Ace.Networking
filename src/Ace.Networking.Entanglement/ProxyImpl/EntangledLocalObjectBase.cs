@@ -7,7 +7,7 @@ using Ace.Networking.Entanglement.Packets;
 using Ace.Networking.Entanglement.Reflection;
 using Ace.Networking.Entanglement.Structures;
 using Ace.Networking.Extensions;
-using Ace.Networking.Interfaces;
+using Ace.Networking.Threading;
 using Ace.Networking.Memory;
 
 namespace Ace.Networking.Entanglement.ProxyImpl

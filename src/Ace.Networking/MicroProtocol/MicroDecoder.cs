@@ -5,7 +5,6 @@ using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Enums;
 using Ace.Networking.MicroProtocol.Headers;
 using Ace.Networking.MicroProtocol.Interfaces;
-using Ace.Networking.MicroProtocol.PacketTypes;
 using Ace.Networking.MicroProtocol.Structures;
 
 namespace Ace.Networking.MicroProtocol
@@ -17,23 +16,23 @@ namespace Ace.Networking.MicroProtocol
         /// </summary>
         public const byte Version = 3;
 
-        private RecyclableMemoryStream _contentStream;// = new MemoryStream();
-
         private int _bytesLeftForCurrentState;
         private int _bytesLeftInSocketBuffer;
+        private int[] _contentLengths;
+
+        private readonly RecyclableMemoryStream _contentStream; // = new MemoryStream();
+        private Type _firstType;
         private BasicHeader _headerObject;
         private int _headerOffset;
         private ushort _headerSize;
 
         private Action<BasicHeader, object, Type> _messageReceived;
+        private object[] _objects;
+        private int _payloadPosition;
         private byte _protocolVersion;
         private RawDataHeader.RawDataHandler _rawDataReceived;
         private int _socketBufferOffset;
         private Func<SocketBuffer, bool> _stateMethod;
-        private int[] _contentLengths;
-        private int _payloadPosition;
-        private object[] _objects;
-        private Type _firstType;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="MicroDecoder" /> class.
@@ -151,29 +150,28 @@ namespace Ace.Networking.MicroProtocol
         {
             if (!CopyBytes(e)) return false;
             _contentStream.Position = 0;
-            _protocolVersion = (byte)_contentStream.ReadByte();
+            _protocolVersion = (byte) _contentStream.ReadByte();
 
             _headerObject = BasicHeader.Upgrade(_contentStream);
 
             _stateMethod = ProcessContent;
             var contentHeader = _headerObject as ContentHeader;
-            if(contentHeader != null)
+            if (contentHeader != null)
             {
                 _contentLengths = contentHeader.ContentLength;
-                if(contentHeader.PacketFlag.HasFlag(PacketFlag.MultiContent))
+                if (contentHeader.PacketFlag.HasFlag(PacketFlag.MultiContent))
                     _objects = new object[contentHeader.ContentLength.Length];
             }
+
             _bytesLeftForCurrentState = contentHeader?.ContentLength[0] ?? -1;
             if (_headerObject.PacketType == PacketType.RawData)
                 _bytesLeftForCurrentState = (_headerObject as RawDataHeader)?.ContentLength ?? -1;
-
 
 
             if (_headerObject.PacketFlag.HasFlag(PacketFlag.NoContent) || _bytesLeftForCurrentState == 0)
             {
                 _bytesLeftForCurrentState = -1;
                 _contentStream.SetLength(0);
-                
             }
             else
             {
@@ -204,7 +202,7 @@ namespace Ace.Networking.MicroProtocol
             _stateMethod = ReadHeaderLength;
             _contentStream?.Seek(0, SeekOrigin.Begin);
 
-            bool isProcessed = false;
+            var isProcessed = false;
             if (_headerObject.PacketType == PacketType.RawData)
             {
                 if (!(_headerObject is RawDataHeader rawData)) return false;
@@ -230,6 +228,7 @@ namespace Ace.Networking.MicroProtocol
                     payload = message;
                     type = resolvedType;
                 }
+
                 if (_objects != null)
                 {
                     _objects[_payloadPosition++] = payload;
@@ -248,18 +247,19 @@ namespace Ace.Networking.MicroProtocol
                 {
                     PacketReceived(content, payload, type);
                 }
+
                 isProcessed = true;
             }
 
             if (isProcessed)
             {
                 _contentStream?.SetLength(0);
-                if(_objects != null)
+                if (_objects != null)
                 {
                     _stateMethod = ProcessContent;
                     _bytesLeftForCurrentState = _contentLengths[_payloadPosition];
                 }
-            
+
                 return true;
             }
 

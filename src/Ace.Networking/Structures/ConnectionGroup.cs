@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Ace.Networking.Handlers;
-using Ace.Networking.Interfaces;
+using Ace.Networking.Threading;
 using Ace.Networking.MicroProtocol.Interfaces;
+using Ace.Networking.TypeResolvers;
 
 namespace Ace.Networking.Structures
 {

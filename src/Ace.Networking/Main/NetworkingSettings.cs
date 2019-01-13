@@ -1,14 +1,10 @@
-﻿using Ace.Networking.MicroProtocol.Interfaces;
-using Ace.Networking.TypeResolvers;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Ace.Networking.TypeResolvers;
 
 namespace Ace.Networking
 {
     public static class NetworkingSettings
     {
-        public static ITypeResolver DefaultTypeResolver { get; } = new DeepGuidTypeResolver();
         public const int BufferSize = 8192;
+        public static ITypeResolver DefaultTypeResolver { get; } = new DeepGuidTypeResolver();
     }
 }

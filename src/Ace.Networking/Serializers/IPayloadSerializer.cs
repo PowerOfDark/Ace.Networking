@@ -2,7 +2,7 @@
 using System.IO;
 using System.Reflection;
 
-namespace Ace.Networking.MicroProtocol.Interfaces
+namespace Ace.Networking.Serializers
 {
     public interface IPayloadSerializer
     {
@@ -17,9 +17,5 @@ namespace Ace.Networking.MicroProtocol.Interfaces
         IPayloadSerializer Clone();
 
         bool IsValidContentType(byte[] contentType);
-
-        //byte[] CreateContentType(Type type);
-
-        //void RegisterAssembly(Assembly assembly);
     }
 }

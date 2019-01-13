@@ -1,4 +1,4 @@
-﻿using Ace.Networking.Interfaces;
+﻿using Ace.Networking.Structures;
 
 namespace Ace.Networking.MicroProtocol.Structures
 {

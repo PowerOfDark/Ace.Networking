@@ -1,4 +1,4 @@
-﻿namespace Ace.Networking.Interfaces
+﻿namespace Ace.Networking.Threading
 {
     public interface INotifyClientDisconnected
     {

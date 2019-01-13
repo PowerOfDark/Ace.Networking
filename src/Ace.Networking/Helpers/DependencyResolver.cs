@@ -7,18 +7,6 @@ namespace Ace.Networking.Helpers
 {
     public class DependencyResolver
     {
-        public struct DependencyEntry<T> where T: class
-        {
-            public Type Type;
-            public T Instance;
-
-            public DependencyEntry(Type type, T instance = default)
-            {
-                Type = type;
-                Instance = instance;
-            }
-        }
-
         public static IDictionary<Type, T> Resolve<T>(IDictionary<Type, DependencyEntry<T>> map) where T : class
         {
             var res = new Dictionary<Type, T>(map.Count);
@@ -56,6 +44,7 @@ namespace Ace.Networking.Helpers
                             continue;
                         }
                     }
+
                     if (obj == null)
                     {
                         var ret = Construct(mn.Type, res);
@@ -68,6 +57,7 @@ namespace Ace.Networking.Helpers
                     }
                 }
             }
+
             foreach (var kv in map)
                 if (!res.ContainsKey(kv.Key))
                     Traverse(kv.Key);
@@ -110,6 +100,18 @@ namespace Ace.Networking.Helpers
                 }
 
             return (T) Activator.CreateInstance(type, obj);
+        }
+
+        public struct DependencyEntry<T> where T : class
+        {
+            public Type Type;
+            public T Instance;
+
+            public DependencyEntry(Type type, T instance = default)
+            {
+                Type = type;
+                Instance = instance;
+            }
         }
     }
 

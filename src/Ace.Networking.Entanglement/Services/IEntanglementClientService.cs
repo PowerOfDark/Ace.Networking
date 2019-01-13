@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Ace.Networking.Entanglement.Structures;
-using Ace.Networking.Interfaces;
+using Ace.Networking.Threading;
 using Ace.Networking.Services;
 
 namespace Ace.Networking.Entanglement.Services

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-using Ace.Networking.Interfaces;
+using Ace.Networking.Threading;
 
 namespace Ace.Networking.Structures
 {

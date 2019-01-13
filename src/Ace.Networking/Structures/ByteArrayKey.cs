@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Ace.Networking.Structures
+﻿namespace Ace.Networking.Structures
 {
     public struct ByteArrayKey
     {
@@ -11,7 +7,7 @@ namespace Ace.Networking.Structures
 
         public override bool Equals(object obj)
         {
-            var other = (ByteArrayKey)obj;
+            var other = (ByteArrayKey) obj;
             return Compare(Bytes, other.Bytes);
         }
 
@@ -20,15 +16,12 @@ namespace Ace.Networking.Structures
             return _hashCode;
         }
 
-        private static int GetHashCode( byte[] bytes)
+        private static int GetHashCode(byte[] bytes)
         {
             unchecked
             {
                 var hash = 17;
-                for (var i = 0; i < bytes.Length; i++)
-                {
-                    hash = hash * 23 + bytes[i];
-                }
+                for (var i = 0; i < bytes.Length; i++) hash = hash * 23 + bytes[i];
                 return hash;
             }
         }
@@ -53,20 +46,25 @@ namespace Ace.Networking.Structures
                 byte* x1 = p1, x2 = p2;
                 var l = a1.Length;
                 for (var i = 0; i < l / 8; i++, x1 += 8, x2 += 8)
-                    if (*(long*)x1 != *(long*)x2) return false;
+                    if (*(long*) x1 != *(long*) x2)
+                        return false;
                 if ((l & 4) != 0)
                 {
-                    if (*(int*)x1 != *(int*)x2) return false;
+                    if (*(int*) x1 != *(int*) x2) return false;
                     x1 += 4;
                     x2 += 4;
                 }
+
                 if ((l & 2) != 0)
                 {
-                    if (*(short*)x1 != *(short*)x2) return false;
+                    if (*(short*) x1 != *(short*) x2) return false;
                     x1 += 2;
                     x2 += 2;
                 }
-                if ((l & 1) != 0) if (*x1 != *x2) return false;
+
+                if ((l & 1) != 0)
+                    if (*x1 != *x2)
+                        return false;
                 return true;
             }
         }

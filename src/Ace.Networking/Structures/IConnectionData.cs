@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Ace.Networking.Interfaces
+namespace Ace.Networking.Threading
 {
     /// <summary>
     ///     Used to store data in a connection

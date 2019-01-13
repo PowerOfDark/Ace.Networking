@@ -1,6 +1,5 @@
 ﻿using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
-using Ace.Networking.MicroProtocol.Interfaces;
 
 namespace Ace.Networking.MicroProtocol.SSL
 {
