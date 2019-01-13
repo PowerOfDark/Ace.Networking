@@ -57,7 +57,7 @@ namespace Ace.Networking
             return this;
         }
 
-        public IConnectionBuilder UseServerSsl(X509Certificate2 certificate = null, bool useClient = true, SslProtocols protocols = SslProtocols.Tls12)
+        public IConnectionBuilder UseServerSsl(X509Certificate2 certificate, bool useClient, SslProtocols protocols)
         {
             if (_config == null) _config = new ProtocolConfiguration();
             this.UseSsl(_config.GetServerSslFactory(certificate, useClient, protocols));
