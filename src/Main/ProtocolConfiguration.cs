@@ -72,12 +72,12 @@ namespace Ace.Networking
         public virtual ClientSslStreamFactory GetClientSslFactory(string targetCommonName = "",
             X509Certificate2 certificate = null, SslProtocols protocols = SslProtocols.Tls12)
         {
-            return null;
+            return new ClientSslStreamFactory(targetCommonName, certificate, protocols);
         }
 
-        public virtual ServerSslStreamFactory GetServerSslFactory(X509Certificate2 certificate = null)
+        public virtual ServerSslStreamFactory GetServerSslFactory(X509Certificate2 certificate = null, bool useClient = true, SslProtocols protocols = SslProtocols.Tls12)
         {
-            return null;
+            return new ServerSslStreamFactory(certificate, useClient, protocols);
         }
     }
 }

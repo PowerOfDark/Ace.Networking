@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Net.Sockets;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 using Ace.Networking.Interfaces;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.Services;
@@ -44,6 +46,21 @@ namespace Ace.Networking
         public IConnectionBuilder UseSsl(ISslStreamFactory factory)
         {
             _sslFactory = factory;
+            return this;
+        }
+
+        public IConnectionBuilder UseClientSsl(string targetCommonName,
+            X509Certificate2 certificate, SslProtocols protocols)
+        {
+            if (_config == null) _config = new ProtocolConfiguration();
+            this.UseSsl(_config.GetClientSslFactory(targetCommonName, certificate, protocols));
+            return this;
+        }
+
+        public IConnectionBuilder UseServerSsl(X509Certificate2 certificate = null, bool useClient = true, SslProtocols protocols = SslProtocols.Tls12)
+        {
+            if (_config == null) _config = new ProtocolConfiguration();
+            this.UseSsl(_config.GetServerSslFactory(certificate, useClient, protocols));
             return this;
         }
 
