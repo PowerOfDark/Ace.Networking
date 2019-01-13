@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using Ace.Networking.Structures;
 
@@ -27,7 +28,7 @@ namespace Ace.Networking.TypeResolvers
         {
             while (type.IsArray)
                 type = type.GetElementType();
-            return new ByteArrayKey(type.GUID.ToByteArray());
+            return new ByteArrayKey(type.GetTypeInfo().GUID.ToByteArray());
         }
 
         public bool SerializeComplexRoot(Stream stream, Type type)
@@ -136,7 +137,7 @@ namespace Ace.Networking.TypeResolvers
             if (!Types.TryGetValue(new ByteArrayKey(chunk), out type))
                 return false;
 
-            if (type.IsGenericTypeDefinition)
+            if (type.GetTypeInfo().IsGenericTypeDefinition)
             {
                 Type[] children = new Type[generics];
                 for (int i = 0; i < generics; i++)

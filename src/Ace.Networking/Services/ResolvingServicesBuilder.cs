@@ -8,8 +8,8 @@ namespace Ace.Networking.Services
 {
     public class ResolvingServicesBuilder<TInterface> : IServicesBuilder<TInterface> where TInterface : class, ICommon
     {
-        private readonly Dictionary<Type, (Type type, IService<TInterface> instance)>
-            _servicesMap = new Dictionary<Type, (Type type, IService<TInterface> instance)>();
+        private readonly Dictionary<Type, DependencyResolver.DependencyEntry<IService<TInterface>>>
+            _servicesMap = new Dictionary<Type, DependencyResolver.DependencyEntry<IService<TInterface>>>();
 
         private readonly Dictionary<Type, Delegate> _pendingConfigs = new Dictionary<Type, Delegate>();
 
@@ -22,7 +22,7 @@ namespace Ace.Networking.Services
         {
             //if (config != null && instance == null)
             //    throw new NotSupportedException("Config action is not supported in ResolvingServicesBuilder");
-            _servicesMap.Add(typeof(TBase), (typeof(T), instance));
+            _servicesMap.Add(typeof(TBase), new DependencyResolver.DependencyEntry<IService<TInterface>>(typeof(T), instance));
             if (instance != null)
                 config?.Invoke(instance);
             else if (config != null)
@@ -36,7 +36,7 @@ namespace Ace.Networking.Services
         public IServicesBuilder<TInterface> Add<TBase, T>()
             where T : class, TBase where TBase : class, IService<TInterface>
         {
-            _servicesMap.Add(typeof(TBase), (typeof(T), null));
+            _servicesMap.Add(typeof(TBase), new DependencyResolver.DependencyEntry<IService<TInterface>>(typeof(T), null));
             return this;
         }
 

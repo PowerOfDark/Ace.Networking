@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.Structures;
@@ -20,17 +21,18 @@ namespace Ace.Networking.TypeResolvers
 
         public byte[] GetRepresentationUtil(Type type, int depth = 1)
         {
-            var guid = type.GUID.ToByteArray();
+            var typeInfo = type.GetTypeInfo();
+            var guid = typeInfo.GUID.ToByteArray();
             byte h = 0x4F;
             if (type.IsArray)
             {
                 h = 0xF4;
-                guid = GetRepresentationUtil(type.BaseType, depth+1);
+                guid = GetRepresentationUtil(typeInfo.BaseType, depth+1);
             }
 
            
             for (int i = 0; i < 16; i++) guid[i] ^= (h = (byte) ((31 * h) + (depth* depth^0b0001100101)));
-            if (type.IsGenericType)
+            if (typeInfo.IsGenericType)
             {
                 int m = 1;
                 foreach (var g in type.GenericTypeArguments)

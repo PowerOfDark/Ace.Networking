@@ -86,7 +86,7 @@ namespace Ace.Networking.Entanglement.Extensions
             }
         }
 
-        public static FieldInfo ImplementEvent(this TypeBuilder b, Type baseType, string name)
+        public static FieldInfo ImplementEvent(this TypeBuilder b, TypeInfo baseType, string name)
         {
             var baseEvent = baseType.GetEvent(name, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             var topEvent = b.DefineEvent(name, baseEvent.Attributes, baseEvent.EventHandlerType);

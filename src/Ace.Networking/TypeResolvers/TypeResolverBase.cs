@@ -21,7 +21,7 @@ namespace Ace.Networking.TypeResolvers
 
         public virtual void RegisterAssembly(Assembly assembly, params Type[] attributes)
         {
-            foreach (var type in assembly.GetTypes().Where(t => attributes.Any(a => t.GetCustomAttribute(a) != null)))
+            foreach (var type in assembly.GetTypes().Where(t => attributes.Any(a => t.GetTypeInfo().GetCustomAttribute(a) != null)))
                 RegisterType(type);
         }
 

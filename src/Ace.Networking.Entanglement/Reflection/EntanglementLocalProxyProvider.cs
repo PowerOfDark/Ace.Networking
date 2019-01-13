@@ -152,7 +152,7 @@ namespace Ace.Networking.Entanglement.Reflection
             {
                 ev.Value.BackingField =
                     result.GeneratedType.GetField(ev.Key, BindingFlags.NonPublic | BindingFlags.Instance);
-                ev.Value.InvokerDelegate = CreateEventInvokerDelegate(type, ev.Value, typeInfo);
+                ev.Value.InvokerDelegate = CreateEventInvokerDelegate(type, ev.Value, typeof(T));
             }
             while (generatedProperties.Any())
             {
