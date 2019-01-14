@@ -81,6 +81,16 @@ namespace Ace.Networking.Entanglement.Reflection
         public IReadOnlyDictionary<string, IReadOnlyCollection<MethodDescriptor>> Methods => _methods;
         public IReadOnlyDictionary<string, EventDescriptor> Events => _events;
 
+        public override bool Equals(object obj)
+        {
+            return ReferenceEquals(this, obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return Type.GetHashCode();
+        }
+
         public static InterfaceDescriptor Get(Type type)
         {
             if (!Cache.TryGetValue(type, out var desc)) Cache.TryAdd(type, desc = new InterfaceDescriptor(type));
@@ -230,17 +240,6 @@ namespace Ace.Networking.Entanglement.Reflection
                     new ParameterDescriptor() {IsOptional = p.IsOptional, Type = p.ParameterType}).ToArray();
             }
 
-        }
-
-        public int Test(EntangledHostedObjectBase ba, int a, string b, DateTime c)
-        {
-            ba.OnEvent("shit", new object[] {a, b, c,});
-            return 5 + 7;
-        }
-
-        public int DoSth(object obj, object[] args)
-        {
-            return ((InterfaceDescriptor) obj).Test((EntangledHostedObjectBase)args[0], (int)args[1], (string)args[2], (DateTime)args[3]);
         }
 
 

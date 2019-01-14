@@ -23,10 +23,14 @@ namespace Ace.Networking.Helpers
             return tcs;
         }
 
-        public static CancellationToken AsCancellationToken(this TimeSpan time)
+        public static TaskCompletionSource<T> New<T>(object state)
         {
-            var cts = new CancellationTokenSource(time);
-            return cts.Token;
+            return new TaskCompletionSource<T>(state, TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        public static TaskCompletionSource<T> New<T>()
+        {
+            return new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         }
     }
 }

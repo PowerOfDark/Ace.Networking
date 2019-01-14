@@ -15,12 +15,8 @@ namespace Ace.Networking
 {
     public class ProtocolConfiguration
     {
-        public static readonly Type[] Primitives =
-        {
-            typeof(object), typeof(Stream), typeof(byte), typeof(int), typeof(uint), typeof(long), typeof(ulong),
-            typeof(bool), typeof(sbyte), typeof(DateTime), typeof(void), typeof(short), typeof(ushort), typeof(double),
-            typeof(float), typeof(List<>), typeof(Dictionary<,>)
-        };
+
+
 
         public static Lazy<ProtocolConfiguration> Instance =
             new Lazy<ProtocolConfiguration>(() => new ProtocolConfiguration());
@@ -67,11 +63,14 @@ namespace Ace.Networking
             if (IsInitialized) return;
             IsInitialized = true;
 
-
+            foreach (var primitive in NetworkingSettings.Primitives)
+                TypeResolver.RegisterType(primitive);
             TypeResolver.RegisterAssembly(GetType().GetTypeInfo().Assembly);
             TypeResolver.RegisterAssembly(typeof(Connection).GetTypeInfo().Assembly);
-            foreach (var primitive in Primitives)
-                TypeResolver.RegisterType(primitive);
+            foreach (var assembly in NetworkingSettings.PacketAssemblies)
+                TypeResolver.RegisterAssembly(assembly);
+
+
         }
 
         public virtual ClientSslStreamFactory GetClientSslFactory(string targetCommonName = "",

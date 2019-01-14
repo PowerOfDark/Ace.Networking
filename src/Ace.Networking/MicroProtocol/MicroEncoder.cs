@@ -22,7 +22,6 @@ namespace Ace.Networking.MicroProtocol
         private readonly IBufferSlice _bufferSlice;
         private Stream _bodyStream;
 
-        private int _bytesEnqueued;
         private int _bytesLeftToSend;
         private int _bytesTransferred;
         private int _contentLength;
@@ -33,7 +32,6 @@ namespace Ace.Networking.MicroProtocol
         private BasicHeader _header;
         private bool _headerCreated;
         private bool _headerIsSent;
-        private int _headerLength;
         private readonly RecyclableMemoryStream _headerStream;
         private object _message;
         private int _payloadPosition;

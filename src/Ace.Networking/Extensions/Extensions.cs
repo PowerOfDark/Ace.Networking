@@ -33,44 +33,26 @@ namespace Ace.Networking.Extensions
             list.AddLast(val);
         }
 
-        public static bool TryAddLast<TKey, TValue>(this ConcurrentDictionary<TKey, LinkedList<TValue>> dict, TKey key,
+        public static void AddLast<TKey, TValue>(this ConcurrentDictionary<TKey, LinkedList<TValue>> dict, TKey key,
             TValue val)
         {
-            var ret = true;
-            LinkedList<TValue> list;
-            if (!dict.TryGetValue(key, out list))
+            var list = dict.GetOrAdd(key, k => new LinkedList<TValue>());
+
+            lock (list)
             {
-                ret = dict.TryAdd(key, list = new LinkedList<TValue>());
-                if (!ret) ret = dict.TryGetValue(key, out list);
+                list.AddLast(val);
             }
-
-            if (ret)
-                lock (list)
-                {
-                    list.AddLast(val);
-                }
-
-            return ret;
         }
 
-        public static bool TryEnqueue<TKey, TValue>(this ConcurrentDictionary<TKey, Queue<TValue>> dict, TKey key,
+        public static void Enqueue<TKey, TValue>(this ConcurrentDictionary<TKey, Queue<TValue>> dict, TKey key,
             TValue val, int capacity = 2)
         {
-            var ret = true;
-            Queue<TValue> queue;
-            if (!dict.TryGetValue(key, out queue))
+            var queue = dict.GetOrAdd(key, k => new Queue<TValue>(capacity));
+
+            lock (queue)
             {
-                ret = dict.TryAdd(key, queue = new Queue<TValue>(capacity));
-                if (!ret) ret = dict.TryGetValue(key, out queue);
+                queue.Enqueue(val);
             }
-
-            if (ret)
-                lock (queue)
-                {
-                    queue.Enqueue(val);
-                }
-
-            return ret;
         }
 
         public static CancellationToken? GetCancellationToken(this TimeSpan? ts)

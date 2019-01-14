@@ -24,7 +24,6 @@ namespace Ace.Networking.MicroProtocol
         private readonly RecyclableMemoryStream _contentStream; // = new MemoryStream();
         private Type _firstType;
         private BasicHeader _headerObject;
-        private int _headerOffset;
         private ushort _headerSize;
 
         private Action<BasicHeader, object, Type> _messageReceived;
@@ -58,7 +57,6 @@ namespace Ace.Networking.MicroProtocol
             _bytesLeftForCurrentState = sizeof(short);
             _bytesLeftInSocketBuffer = 0;
             _contentStream?.Dispose();
-            _headerOffset = 0;
             _socketBufferOffset = 0;
             _contentLengths = null;
             _objects = null;

@@ -10,10 +10,12 @@ namespace Ace.Networking.TypeResolvers
 {
     public abstract class TypeResolver<TKey> : ITypeResolver
     {
-        protected readonly ConcurrentDictionary<TKey, Type> Types;
-        protected readonly ConcurrentDictionary<Type, TKey> TypesLookup;
+        protected static readonly ConcurrentDictionary<TKey, Type> Types;
+        protected static readonly ConcurrentDictionary<Type, TKey> TypesLookup;
+        protected static readonly HashSet<Assembly> Assemblies = new HashSet<Assembly>();
 
-        public TypeResolver()
+
+        static TypeResolver()
         {
             Types = Types ?? new ConcurrentDictionary<TKey, Type>();
             TypesLookup = TypesLookup ?? new ConcurrentDictionary<Type, TKey>();
@@ -24,6 +26,7 @@ namespace Ace.Networking.TypeResolvers
 
         public virtual void RegisterAssembly(Assembly assembly, params Type[] attributes)
         {
+            
             foreach (var type in assembly.GetTypes()
                 .Where(t => attributes.Any(a => t.GetTypeInfo().GetCustomAttribute(a) != null)))
                 RegisterType(type);
@@ -31,10 +34,12 @@ namespace Ace.Networking.TypeResolvers
 
         public virtual void RegisterAssembly(Assembly assembly)
         {
+            if (!Assemblies.Add(assembly)) return;
             RegisterAssembly(assembly, typeof(ProtoContractAttribute));
         }
 
         public abstract bool TryResolve(Stream stream, out Type type);
+
         public abstract bool TryWrite(Stream stream, Type type);
 
         public virtual void RegisterType(Type type)

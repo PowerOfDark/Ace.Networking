@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 using Ace.Networking.Entanglement.Packets;
@@ -20,6 +21,8 @@ namespace Ace.Networking.Entanglement
 
         public bool IsActive => _connection != null && _connection.Connected;
 
+        protected HashSet<InterfaceDescriptor> RegisteredTypes = new HashSet<InterfaceDescriptor>();
+
         public void Attach(IConnection server)
         {
             if (IsActive)
@@ -27,14 +30,21 @@ namespace Ace.Networking.Entanglement
             LocalInstances.Clear();
             _connection = server;
 
+            RegisterTypes(server);
+
             server.On<UpdateProperties>(OnUpdateProperties);
             server.On<RaiseEvent>(OnRaiseEvent);
+        }
+
+        private void RegisterTypes(IConnection server)
+        {
+            server.TypeResolver.RegisterAssembly(typeof(EntanglementClientService).GetTypeInfo().Assembly);
         }
 
         public void Detach(IConnection server)
         {
             if (server == null || !server.Equals(_connection)) return;
-
+            RegisteredTypes.Clear();
             server.Off<UpdateProperties>(OnUpdateProperties);
             server.Off<RaiseEvent>(OnRaiseEvent);
             LocalInstances.Clear();
@@ -60,11 +70,45 @@ namespace Ace.Networking.Entanglement
             if (instance != null) return (T) (object) instance;
 
             instance = EntanglementLocalProxyProvider.Get<T>(_connection, result.Eid.Value);
+            RegisterType(instance);
             LocalInstances.TryAdd(result.Eid.Value, instance);
 
             var props = await _connection.SendRequest<UpdateRequest, UpdateProperties>(new UpdateRequest() {Eid = result.Eid.Value}).ConfigureAwait(false);
             OnUpdateProperties(_connection, props);
             return (T) (object) instance;
+        }
+
+        public void RegisterType(EntangledLocalObjectBase obj)
+        {
+            lock (RegisteredTypes)
+            {
+                if (!RegisteredTypes.Add(obj._Descriptor)) return;
+            }
+
+            var resolver = _connection.TypeResolver;
+            var desc = obj._Descriptor;
+            foreach (var ml in desc.Methods)
+            {
+                foreach (var m in ml.Value)
+                {
+                    resolver.RegisterType(m.RealReturnType);
+                    foreach (var p in m.Parameters)
+                        resolver.RegisterType(p.Type);
+                }
+            }
+
+            foreach (var pl in desc.Properties)
+            {
+                resolver.RegisterType(pl.Value.Property.PropertyType);
+            }
+
+            foreach (var ev in desc.Events)
+            {
+                foreach (var parameter in ev.Value.Parameters)
+                {
+                    resolver.RegisterType(parameter.Type);
+                }
+            }
         }
 
         protected EntangledLocalObjectBase GetExistingInstance<T>(Guid? eid = null) where T : class/*, IEntangledObject*/

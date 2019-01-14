@@ -90,19 +90,29 @@ namespace Ace.Networking.Entanglement
             if (resolver == null) throw new ArgumentNullException(nameof(resolver));
             if (entry == null) throw new ArgumentNullException(nameof(entry));
 
+            resolver.RegisterAssembly(typeof(EntanglementHostService).GetTypeInfo().Assembly);
+
             foreach (var ml in entry.InterfaceDescriptor.Methods)
             {
                 foreach (var m in ml.Value)
                 {
                     resolver.RegisterType(m.RealReturnType);
                     foreach (var p in m.Parameters)
-                        Host.TypeResolver.RegisterType(p.Type);
+                        resolver.RegisterType(p.Type);
                 }
             }
 
             foreach (var pl in entry.InterfaceDescriptor.Properties)
             {
                 resolver.RegisterType(pl.Value.Property.PropertyType);
+            }
+
+            foreach (var ev in entry.InterfaceDescriptor.Events)
+            {
+                foreach (var parameter in ev.Value.Parameters)
+                {
+                    resolver.RegisterType(parameter.Type);
+                }
             }
         }
 

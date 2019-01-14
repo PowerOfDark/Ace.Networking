@@ -8,8 +8,8 @@ using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Ace.Networking.Extensions;
 using Ace.Networking.Handlers;
+using Ace.Networking.Helpers;
 using Ace.Networking.MicroProtocol;
 using Ace.Networking.MicroProtocol.Enums;
 using Ace.Networking.MicroProtocol.Headers;
@@ -47,22 +47,10 @@ namespace Ace.Networking
         internal readonly ConcurrentDictionary<int, LinkedList<RawDataHeader.RawDataHandler>> _rawDataHandlers =
             new ConcurrentDictionary<int, LinkedList<RawDataHeader.RawDataHandler>>();
 
-        internal readonly LinkedList<TaskCompletionSource<object>> _receiveFilters =
-            new LinkedList<TaskCompletionSource<object>>();
 
-        internal readonly object _receiveFiltersLock = new object();
         internal readonly SemaphoreSlim _receiveLock = new SemaphoreSlim(1, 1);
 
-        /// <summary>
-        ///     where object is TaskCompletionSource of T; can't avoid boxing/unboxing
-        /// </summary>
-        internal readonly ConcurrentDictionary<Type, LinkedList<TaskCompletionSource<object>>> _receiveTypeFilters =
-            new ConcurrentDictionary<Type, LinkedList<TaskCompletionSource<object>>>();
-
-        internal readonly ConcurrentDictionary<Type, Queue<TaskCompletionSource<RequestWrapper>>> _requestHandlers =
-            new ConcurrentDictionary<Type, Queue<TaskCompletionSource<RequestWrapper>>>();
-
-        internal readonly ConcurrentDictionary<int, TaskCompletionSource<object>> _responseHandlers =
+        internal readonly ConcurrentDictionary<int, TaskCompletionSource<object>> _responseTasks =
             new ConcurrentDictionary<int, TaskCompletionSource<object>>();
 
         internal readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
@@ -82,7 +70,7 @@ namespace Ace.Networking
         private Thread _receiveWorkerThread;
         private volatile bool _receiveWorkerThreadRunning;
 
-        private TaskCompletionSource<object> _sendCompletionSource;
+
         private Thread _sendWorkerThread;
         private volatile bool _sendWorkerThreadRunning;
 
@@ -319,6 +307,42 @@ namespace Ace.Networking
             return _rawDataHandlers.TryRemove(bufId, out _);
         }
 
+
+        public Task<object> SendReceive<TSend>(TSend obj, PayloadFilter filter,
+            CancellationToken? token = null)
+        {
+            var res = Receive(filter, token);
+            Send(obj);
+            return res;
+        }
+
+
+        public Task<TReceive> SendReceive<TSend, TReceive>(TSend obj, CancellationToken? token = null)
+        {
+            var res = Receive<TReceive>(token);
+            Send(obj);
+            return res;
+        }
+
+        public Task<object> SendRequest<TRequest>(TRequest req, CancellationToken? token = null)
+        {
+            var id = Interlocked.Increment(ref _lastRequestId);
+            var tcs = TaskHelper.New<object>(id);
+
+            if (!_responseTasks.TryAdd(id, tcs)) throw new InvalidOperationException();
+
+            EnqueueSendPacket(new TrackablePacket<TRequest>(new TrackableHeader(id, PacketFlag.IsRequest), req));
+
+            token?.Register(t =>
+            {
+                var task = (TaskCompletionSource<object>) t;
+                task.TrySetCanceled();
+                _responseTasks.TryRemove((int) task.Task.AsyncState, out _);
+            }, tcs);
+
+            return tcs.Task;
+        }
+
         public TcpClient Client { get; private set; }
 
         ISslCertificatePair ISslContainer.SslCertificates
@@ -363,25 +387,13 @@ namespace Ace.Networking
                 if (header is TrackableHeader tHeader)
                 {
                     if (header.PacketFlag.HasFlag(PacketFlag.IsRequest))
-                    {
                         unboxedRequest = tHeader.RequestId;
-                        if (_requestHandlers.TryGetValue(type, out var queue))
-                        {
-                            var wrapper = new RequestWrapper(this, tHeader.RequestId, obj);
-                            lock (queue)
-                            {
-                                while (queue.Count > 0) handled |= queue.Dequeue()?.TrySetResult(wrapper) ?? false;
-                            }
-                        }
-                    }
                     else if (header.PacketFlag.HasFlag(PacketFlag.IsResponse))
-                    {
-                        if (_responseHandlers.TryRemove(tHeader.RequestId, out var tcs))
+                        if (_responseTasks.TryRemove(tHeader.RequestId, out var tcs))
                         {
                             handled = true;
                             tcs.TrySetResult(obj);
                         }
-                    }
                 }
 
             //[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -395,38 +407,6 @@ namespace Ace.Networking
                     EnqueueSend(o);
             }
 
-            if (_receiveTypeFilters.Count > 0)
-                if (_receiveTypeFilters.TryGetValue(type, out var list))
-                    lock (list)
-                    {
-                        foreach (var tcs in list) tcs.TrySetResult(obj);
-                    }
-
-            if (_receiveFilters.Count > 0)
-                lock (_receiveFiltersLock)
-                {
-                    var enumerator = _receiveFilters.First;
-                    while (enumerator != null)
-                    {
-                        var delete = true;
-                        if (enumerator.Value.Task.AsyncState is PayloadFilter f)
-                            try
-                            {
-                                if (f(obj, type))
-                                    enumerator.Value.TrySetResult(obj);
-                                else
-                                    delete = false;
-                            }
-                            catch
-                            {
-                                // ignored
-                            }
-
-                        var next = enumerator.Next;
-                        if (delete) _receiveFilters.Remove(enumerator);
-                        enumerator = next;
-                    }
-                }
 
             handled |= ProcessPayloadHandlers(this, obj, type, SendResponse, unboxedRequest);
 
@@ -698,90 +678,6 @@ namespace Ace.Networking
             return EnqueueSendContent(payload);
         }
 
-        /// <summary>
-        ///     Returns the first packet for which <b>filter</b> yields true
-        /// </summary>
-        /// <param name="filter"></param>
-        /// <param name="timeout"></param>
-        /// <returns></returns>
-        public Task<object> Receive(PayloadFilter filter, CancellationToken? token = null)
-        {
-            var tcs = new TaskCompletionSource<object>(filter, TaskCreationOptions.RunContinuationsAsynchronously);
-
-            lock (_receiveFiltersLock)
-            {
-                _receiveFilters.AddLast(tcs);
-            }
-
-            token?.Register(t => ((TaskCompletionSource<object>) t).TrySetCanceled(), tcs);
-            return tcs.Task;
-        }
-
-
-        public async Task<T> Receive<T>(CancellationToken? token = null)
-        {
-            var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-            if (!_receiveTypeFilters.TryAddLast(typeof(T), tcs)) throw new InvalidOperationException();
-
-            token?.Register(t => ((TaskCompletionSource<object>) t).TrySetCanceled(), tcs);
-
-            return (T) await tcs.Task.ConfigureAwait(false);
-        }
-
-
-        public Task<object> SendReceive<TSend>(TSend obj, PayloadFilter filter,
-            CancellationToken? token = null)
-        {
-            var res = Receive(filter, token);
-            Send(obj);
-            return res;
-        }
-
-
-        public Task<TReceive> SendReceive<TSend, TReceive>(TSend obj, CancellationToken? token = null)
-        {
-            var res = Receive<TReceive>(token);
-            Send(obj);
-            return res;
-        }
-
-        public Task<object> SendRequest<TRequest>(TRequest req, CancellationToken? token = null)
-        {
-            var id = Interlocked.Increment(ref _lastRequestId);
-            var tcs = new TaskCompletionSource<object>(id, TaskCreationOptions.RunContinuationsAsynchronously);
-
-            if (!_responseHandlers.TryAdd(id, tcs)) throw new InvalidOperationException();
-
-            EnqueueSendPacket(new TrackablePacket<TRequest>(new TrackableHeader(id, PacketFlag.IsRequest), req));
-
-            token?.Register(t =>
-            {
-                var task = (TaskCompletionSource<object>) t;
-                task.TrySetCanceled();
-                _responseHandlers.TryRemove((int) task.Task.AsyncState, out _);
-            }, tcs);
-
-            return tcs.Task;
-        }
-
-        public Task<RequestWrapper> ReceiveRequest(Type type, CancellationToken? token = null)
-        {
-            var tcs = new TaskCompletionSource<RequestWrapper>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            if (!_requestHandlers.TryEnqueue(type, tcs)) throw new InvalidOperationException();
-
-            token?.Register(t => ((TaskCompletionSource<RequestWrapper>) t).TrySetCanceled(), tcs);
-
-            return tcs.Task;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<RequestWrapper> ReceiveRequest<T>(CancellationToken? token = null)
-        {
-            return ReceiveRequest(typeof(T), token);
-        }
-
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task EnqueueSendRaw(int bufId, int seq, byte[] buf, int count = -1)
         {
@@ -838,33 +734,30 @@ namespace Ace.Networking
 
         private void ClearHandlers(Exception exception)
         {
-            foreach (var t in _responseHandlers) t.Value.TrySetException(exception);
-            _responseHandlers.Clear();
+            foreach (var t in _responseTasks)
+                t.Value.TrySetException(exception);
+            _responseTasks.Clear();
 
-            foreach (var kv in _requestHandlers)
+            foreach (var kv in Bindings)
             {
-                var queue = kv.Value;
-                lock (queue)
+                var binding = kv.Value;
+                lock (binding.ReceiveTasks)
                 {
-                    while (queue.Count > 0) queue.Dequeue()?.TrySetException(exception);
-                }
-            }
-
-            lock (_receiveFiltersLock)
-            {
-                foreach (var t in _receiveFilters) t.TrySetException(exception);
-                _receiveFilters.Clear();
-            }
-
-            foreach (var kv in _receiveTypeFilters)
-                lock (kv.Value)
-                {
-                    foreach (var t in kv.Value) t.TrySetException(exception);
+                    while (binding.ReceiveTasks.Count > 0) binding.ReceiveTasks.Dequeue()?.TrySetException(exception);
                 }
 
-            while (_sendQueue.TryDequeue(out var s)) s.TrySetException(exception);
+                lock (binding.RequestTasks)
+                {
+                    while (binding.RequestTasks.Count > 0) binding.RequestTasks.Dequeue()?.TrySetException(exception);
+                }
+            }
 
             _rawDataHandlers.Clear();
+
+            RemoveAllHandlers();
+
+            while (_sendQueue.TryDequeue(out var s))
+                s.TrySetException(exception);
         }
 
         /// <summary>
@@ -883,7 +776,6 @@ namespace Ace.Networking
             _sslStream?.Dispose();
             _writeBuffer = _readBuffer = null;
             _payloadPending = _payloadPendingType = null;
-            _sendCompletionSource = null;
             Data?.Clear();
 
             Connected = false;

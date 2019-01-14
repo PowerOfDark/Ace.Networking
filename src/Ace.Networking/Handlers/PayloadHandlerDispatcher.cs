@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using Ace.Networking.Extensions;
+using System.Threading;
+using System.Threading.Tasks;
+using Ace.Networking.Helpers;
 using Ace.Networking.Interfaces;
-using Ace.Networking.Threading;
 
 namespace Ace.Networking.Handlers
 {
@@ -73,26 +74,62 @@ namespace Ace.Networking.Handlers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void OnRequest(Type type, RequestHandler handler)
         {
-            RequestHandlers.Append(type, handler);
+            AppendRequestHandler(type, handler);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool OffRequest(Type type)
         {
-            return RequestHandlers.TryRemove(type, out _);
+            return RemoveAllRequestHandlers(type);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool OffRequest(Type type, RequestHandler handler)
         {
-            if (RequestHandlers.TryGetValue(type, out var list)) return list.RemoveFirst(t => t == handler);
-            return false;
+            return RemoveRequestHandler(type, handler);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool OffRequest<T>()
         {
             return OffRequest(typeof(T));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Off()
+        {
+            RemoveAllHandlers();
+        }
+
+        /// <summary>
+        ///     Returns the first packet for which <b>filter</b> yields true
+        /// </summary>
+        /// <param name="filter"></param>
+        /// <param name="timeout"></param>
+        /// <returns></returns>
+        public Task<object> Receive(Connection.PayloadFilter filter, CancellationToken? token = null)
+        {
+            var tcs = TaskHelper.New<object>(filter);
+
+            token?.Register(t => ((TaskCompletionSource<object>) t).TrySetCanceled(), tcs);
+            AppendFilter(tcs);
+
+            return tcs.Task;
+        }
+
+
+        public Task<object> Receive(Type type, CancellationToken? token = null)
+        {
+            var tcs = TaskHelper.New<object>();
+            AppendReceiveTask(type, tcs);
+            token?.Register(t => ((TaskCompletionSource<object>) t).TrySetCanceled(), tcs);
+            return tcs.Task;
+        }
+
+        public async Task<T> Receive<T>(CancellationToken? token = null)
+        {
+            var task = Receive(typeof(T), token);
+            return (T) await task.ConfigureAwait(false);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -131,19 +168,14 @@ namespace Ace.Networking.Handlers
             return RemoveTypeHandler(typeof(T), handler);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Off()
-        {
-            RemoveAllTypeHandlers();
-        }
-
         /// <summary>
         ///     Returns the current request handlers for the specified type, or null if doesn't exist
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IReadOnlyCollection<RequestHandler> OnRequest(Type type)
         {
-            if (RequestHandlers.TryGetValue(type, out var handler)) return handler;
+            if (Bindings.TryGetValue(type, out var binding))
+                return binding.RequestHandlers;
             return null;
         }
 
@@ -153,16 +185,58 @@ namespace Ace.Networking.Handlers
             return OnRequest(typeof(T));
         }
 
+        public Task<IRequestWrapper> ReceiveRequest(Type type, CancellationToken? token = null)
+        {
+            var tcs = TaskHelper.New<IRequestWrapper>();
+            AppendRequestTask(type, tcs);
+            token?.Register(t => ((TaskCompletionSource<IRequestWrapper>)t).TrySetCanceled(), tcs);
+            return tcs.Task;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<IRequestWrapper> ReceiveRequest<T>(CancellationToken? token = null)
+        {
+            return ReceiveRequest(typeof(T), token);
+        }
+
         protected bool ProcessPayloadHandlers(IConnection connection, object obj, Type type,
             Action<object> responseSender = null, int? requestId = null)
         {
             var handled = false;
-            if (TypeHandlers.TryGetValue(type, out var list))
-                lock (list)
+            if (Bindings.TryGetValue(type, out var binding))
+            {
+                if (requestId.HasValue)
+                {
+                    var wrapper = new RequestWrapper(connection, requestId.Value, obj);
+                    lock (binding.RequestHandlers)
+                    {
+                        foreach (var h in binding.RequestHandlers)
+                            try
+                            {
+                                if (h?.Invoke(wrapper) ?? false)
+                                {
+                                    handled = true;
+                                    break;
+                                }
+                            }
+                            catch
+                            {
+                            }
+                    }
+
+                    if (!handled)
+                        lock (binding.RequestTasks)
+                        {
+                            while (binding.RequestTasks.Count > 0)
+                                handled |= binding.RequestTasks.Dequeue().TrySetResult(wrapper);
+                        }
+                }
+
+                lock (binding.TypeHandlers)
                 {
                     try
                     {
-                        foreach (var f in list)
+                        foreach (var f in binding.TypeHandlers)
                         {
                             var r = f.Invoke(connection, obj, type);
                             responseSender?.Invoke(r);
@@ -178,24 +252,37 @@ namespace Ace.Networking.Handlers
                     // An exception in one of the handlers breaks the chain
                 }
 
-            if (requestId.HasValue)
-                if (RequestHandlers.TryGetValue(type, out var handler))
-                    lock (handler)
+                lock (binding.ReceiveTasks)
+                {
+                    while (binding.ReceiveTasks.Count > 0) handled |= binding.ReceiveTasks.Dequeue().TrySetResult(obj);
+                }
+            }
+
+            if (ReceiveFilters.Count > 0)
+                lock (ReceiveFilters)
+                {
+                    var enumerator = ReceiveFilters.First;
+                    while (enumerator != null)
                     {
-                        var wrapper = new RequestWrapper(connection, requestId.Value, obj);
-                        foreach (var h in handler)
+                        var delete = true;
+                        if (enumerator.Value.Task.AsyncState is Connection.PayloadFilter f)
                             try
                             {
-                                if (h?.Invoke(wrapper) ?? false)
-                                {
-                                    handled = true;
-                                    break;
-                                }
+                                if (f(obj, type))
+                                    handled |= enumerator.Value.TrySetResult(obj);
+                                else
+                                    delete = false;
                             }
                             catch
                             {
+                                // ignored
                             }
+
+                        var next = enumerator.Next;
+                        if (delete) ReceiveFilters.Remove(enumerator);
+                        enumerator = next;
                     }
+                }
 
             return handled;
         }
