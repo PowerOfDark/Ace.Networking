@@ -3,12 +3,13 @@ using Ace.Networking.Handlers;
 using Ace.Networking.Interfaces;
 using Ace.Networking.MicroProtocol.Headers;
 using Ace.Networking.MicroProtocol.Interfaces;
+using Ace.Networking.MicroProtocol.SSL;
 using Ace.Networking.Services;
 using Ace.Networking.Structures;
 
 namespace Ace.Networking
 {
-    public interface IConnection : IConnectionInterface, IServiceContainer<IConnection>
+    public interface IConnection : IConnectionInterface, IServiceContainer<IConnection>, ISslContainer
     {
         long Identifier { get; }
         Guid Guid { get; }

@@ -25,7 +25,7 @@ using Ace.Networking.TypeResolvers;
 
 namespace Ace.Networking
 {
-    public sealed class Connection : PayloadHandlerDispatcher, IDisposable, IConnection, ISslContainer
+    public sealed class Connection : PayloadHandlerDispatcher, IDisposable, IConnection
     {
         public delegate void DisconnectHandler(IConnection connection, Exception exception);
 
