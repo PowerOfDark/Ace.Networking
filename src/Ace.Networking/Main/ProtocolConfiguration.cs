@@ -54,7 +54,6 @@ namespace Ace.Networking
 
         public SslMode SslMode { get; set; }
 
-        public bool RequireClientCertificate { get; protected set; }
         public ThreadedQueueProcessor<SendMessageQueueItem> CustomOutcomingMessageQueue { get; protected set; }
         public ThreadedQueueProcessor<ReceiveMessageQueueItem> CustomIncomingMessageQueue { get; protected set; }
 

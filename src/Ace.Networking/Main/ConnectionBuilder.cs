@@ -18,10 +18,9 @@ namespace Ace.Networking
         private IServicesBuilder<IConnection> _services;
         private ISslStreamFactory _sslFactory;
 
-        public IConnectionBuilder UseConfig(ProtocolConfiguration config)
+        public ConnectionBuilder(ProtocolConfiguration config = null)
         {
-            _config = config;
-            return this;
+            _config = config ?? new ProtocolConfiguration();
         }
 
         public IConnectionBuilder UseServices(IServicesBuilder<IConnection> services)
@@ -61,7 +60,6 @@ namespace Ace.Networking
 
         public IConnectionBuilder UseServerSsl(X509Certificate2 certificate, bool useClient, SslProtocols protocols)
         {
-            if (_config == null) _config = new ProtocolConfiguration();
             UseSsl(_config.GetServerSslFactory(certificate, useClient, protocols));
             return this;
         }
@@ -84,13 +82,11 @@ namespace Ace.Networking
 
         public IPayloadSerializer GetSerializer()
         {
-            if (_config == null) _config = new ProtocolConfiguration();
             return _config.Serializer;
         }
 
         public ITypeResolver GetTypeResolver()
         {
-            if (_config == null) _config = new ProtocolConfiguration();
             return _config.TypeResolver;
         }
     }

@@ -12,7 +12,7 @@ namespace Ace.Networking
 {
     public interface IConnectionBuilder
     {
-        IConnectionBuilder UseConfig(ProtocolConfiguration config);
+        //IConnectionBuilder UseConfig(ProtocolConfiguration config);
         IConnectionBuilder UseServices(IServicesBuilder<IConnection> services);
 
         IConnectionBuilder UseServices<TBuilder>(Func<TBuilder, IServicesBuilder<IConnection>> config)

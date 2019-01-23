@@ -27,7 +27,7 @@ namespace Ace.Networking.Memory
             _buffer = mgr.Pool.Rent(8);
         }
 
-        public IList<byte[]> Blocks { get; } = new List<byte[]>();
+        public List<byte[]> Blocks { get; } = new List<byte[]>();
         public int CurrentBlockOffset { get; private set; }
 
         public int CurrentBlockLength => _currentBlock < 0 ? 0 : Blocks[_currentBlock].Length;
@@ -105,11 +105,6 @@ namespace Ace.Networking.Memory
             while (Blocks.Any() && _maxLength - Blocks.Last().Length >= _currentLength
                                 && _maxLength - Blocks.Last().Length >= _mgr.MinimumSize)
                 PopBlock();
-            if (Blocks.Count == 1 && Blocks.First().Length > _mgr.MinimumSize)
-            {
-                PopBlock();
-                TryExtend((int) _mgr.MinimumSize);
-            }
         }
 
         public void ShrinkTo(long length)
@@ -183,12 +178,6 @@ namespace Ace.Networking.Memory
         {
             if (origin == SeekOrigin.Current) offset += _currentOffset;
             if (origin == SeekOrigin.End) offset = _currentLength - offset;
-            if (offset == 0)
-            {
-                _currentBlock = CurrentBlockOffset = 0;
-                _currentOffset = 0;
-                return 0;
-            }
 
             if (offset < 0 || offset > _maxLength)
                 throw new InvalidOperationException();
@@ -230,7 +219,7 @@ namespace Ace.Networking.Memory
 
         public override void SetLength(long value)
         {
-            if (value == 0 && _mgr.MinimumSize == 0)
+            /*if (value == 0 && _mgr.MinimumSize == 0)
             {
                 _currentLength = _maxLength = _currentOffset = 0;
                 CurrentBlockOffset = 0;
@@ -240,7 +229,7 @@ namespace Ace.Networking.Memory
                 _nextSize = _mgr.BaseSize;
                 Blocks.Clear();
                 return;
-            }
+            }*/
 
             if (value > _currentLength)
             {
