@@ -32,17 +32,17 @@ namespace Ace.Networking.MicroProtocol.Headers
         public override void Serialize(RecyclableMemoryStream target)
         {
             base.Serialize(target);
-            target.Write(RawDataBufferId);
-            target.Write(RawDataSeq);
-            target.Write(ContentLength);
+            target.Write7BitInt(RawDataBufferId);
+            target.Write7BitInt(RawDataSeq);
+            target.Write7BitInt(ContentLength);
         }
 
         public override BasicHeader Deserialize(RecyclableMemoryStream target)
         {
             base.Deserialize(target);
-            RawDataBufferId = target.ReadInt32();
-            RawDataSeq = target.ReadInt32();
-            ContentLength = target.ReadInt32();
+            RawDataBufferId = target.Read7BitInt();
+            RawDataSeq = target.Read7BitInt();
+            ContentLength = target.Read7BitInt();
 
             return this;
         }

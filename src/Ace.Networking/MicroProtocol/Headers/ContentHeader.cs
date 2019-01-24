@@ -25,7 +25,7 @@ namespace Ace.Networking.MicroProtocol.Headers
             int len = target.ReadInt16();
             ContentLength = new int[len];
             for (var i = 0; i < len; i++)
-                ContentLength[i] = target.ReadInt32();
+                ContentLength[i] = target.Read7BitInt();
 
             return this;
         }
@@ -39,7 +39,7 @@ namespace Ace.Networking.MicroProtocol.Headers
             target.Write(ContentType, 0, ContentTypeLength);
             target.Write(checked((short) ContentLength.Length));
             foreach (var i in ContentLength)
-                target.Write(i);
+                target.Write7BitInt(i);
         }
     }
 }
