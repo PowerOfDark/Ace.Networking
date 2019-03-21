@@ -89,7 +89,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
         public void UpdateProperties(IConnection host, UpdateProperties updates)
         {
-            if ((updates?.Updates.Count ?? 0) == 0) return;
+            if ((updates?.Updates?.Count ?? 0) == 0) return;
 
             lock (_sync)
             {
