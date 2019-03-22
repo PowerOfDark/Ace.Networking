@@ -24,7 +24,7 @@ namespace Ace.Networking
             typeof(object), typeof(Stream), typeof(byte), typeof(int), typeof(uint), typeof(long), typeof(ulong),
             typeof(bool), typeof(sbyte), typeof(DateTime), typeof(void), typeof(short), typeof(ushort), typeof(double),
             typeof(float), typeof(List<>), typeof(Dictionary<,>), typeof(Guid), typeof(System.IntPtr), typeof(System.TimeSpan), typeof(DateTimeOffset),
-            typeof(char), typeof(HashSet<>), typeof(LinkedList<>),
+            typeof(char), typeof(HashSet<>), typeof(LinkedList<>), typeof(string),
         };
 
         private static readonly List<Assembly> _packetAssemblies = new List<Assembly>();
