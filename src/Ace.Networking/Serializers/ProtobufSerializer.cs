@@ -20,6 +20,7 @@ namespace Ace.Networking.Serializers
 
         public override object DeserializeType(Type type, Stream source)
         {
+            if (type == typeof(object)) return null;
             return Serializer.NonGeneric.Deserialize(type, source);
         }
 
