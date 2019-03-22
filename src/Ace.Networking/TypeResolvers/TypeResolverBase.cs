@@ -50,6 +50,8 @@ namespace Ace.Networking.TypeResolvers
             if (Types.TryGetValue(guid, out var t1) && t1 != type /*||
                 TypesLookup.TryGetValue(type, out var t2) && !EqualityComparer<TKey>.Default.Equals(t2, guid)*/)
                 throw new ArgumentException(nameof(type));
+            if (TypesLookup.TryGetValue(type, out var t2) && !EqualityComparer<TKey>.Default.Equals(t2, guid))
+                return;
             Types[guid] = type;
             TypesLookup[type] = guid;
         }
