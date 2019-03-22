@@ -66,5 +66,10 @@ namespace Ace.Networking.TypeResolvers
             if (read != 16) return false;
             return Types.TryGetValue(new ByteArrayKey(buf), out type);
         }
+
+        public override ByteArrayKey GetBy(Guid guid)
+        {
+            return new ByteArrayKey(guid.ToByteArray());
+        }
     }
 }

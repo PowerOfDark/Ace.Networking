@@ -10,6 +10,7 @@ namespace Ace.Networking.TypeResolvers
         bool TryResolve(Stream stream, out Type type);
         bool TryWrite(Stream stream, Type type);
         void RegisterType(Type type);
+        void RegisterTypeBy(Type type, Guid guid);
         void RegisterAssembly(Assembly assembly);
         void RegisterAssembly(Assembly assembly, params Type[] attributes);
     }

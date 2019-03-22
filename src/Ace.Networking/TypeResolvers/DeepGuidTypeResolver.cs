@@ -173,5 +173,10 @@ namespace Ace.Networking.TypeResolvers
                 throw new InvalidDataException("Invalid type resolver signature");
             return DeserializeComplex(stream, out type);
         }
+
+        public override ByteArrayKey GetBy(Guid guid)
+        {
+            return new ByteArrayKey(guid.ToByteArray());
+        }
     }
 }

@@ -62,8 +62,11 @@ namespace Ace.Networking
             if (IsInitialized) return;
             IsInitialized = true;
 
+            int i = 0;
             foreach (var primitive in NetworkingSettings.Primitives)
-                TypeResolver.RegisterType(primitive);
+            {
+                TypeResolver.RegisterTypeBy(primitive, NetworkingSettings.GetPrimitiveGuid(i++));
+            }
             TypeResolver.RegisterAssembly(GetType().GetTypeInfo().Assembly);
             TypeResolver.RegisterAssembly(typeof(Connection).GetTypeInfo().Assembly);
             foreach (var assembly in NetworkingSettings.PacketAssemblies)

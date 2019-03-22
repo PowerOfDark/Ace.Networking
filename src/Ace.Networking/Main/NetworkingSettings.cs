@@ -12,6 +12,13 @@ namespace Ace.Networking
     {
         public const int BufferSize = 8192;
 
+        public static readonly string PrimitiveGuid = "B186FDC0-C92A-4B9E-A7F9-";
+
+        public static Guid GetPrimitiveGuid(int i)
+        {
+            return Guid.Parse(PrimitiveGuid + (i.ToString("D12")));
+        }
+
         public static readonly Type[] Primitives =
         {
             typeof(object), typeof(Stream), typeof(byte), typeof(int), typeof(uint), typeof(long), typeof(ulong),

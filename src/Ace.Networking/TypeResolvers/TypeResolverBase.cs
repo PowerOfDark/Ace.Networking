@@ -42,9 +42,11 @@ namespace Ace.Networking.TypeResolvers
 
         public abstract bool TryWrite(Stream stream, Type type);
 
-        public virtual void RegisterType(Type type)
+        
+
+        public virtual void RegisterType(Type type, TKey key)
         {
-            var guid = GetRepresentation(type);
+            var guid = key;
             if (Types.TryGetValue(guid, out var t1) && t1 != type ||
                 TypesLookup.TryGetValue(type, out var t2) && !EqualityComparer<TKey>.Default.Equals(t2, guid))
                 throw new ArgumentException(nameof(type));
@@ -52,6 +54,18 @@ namespace Ace.Networking.TypeResolvers
             TypesLookup[type] = guid;
         }
 
+        public virtual void RegisterTypeBy(Type type, Guid guid)
+        {
+            RegisterType(type, GetBy(guid));
+        }
+
+        public virtual void RegisterType(Type type)
+        {
+            var guid = GetRepresentation(type);
+            RegisterType(type, guid);
+        }
+
         public abstract TKey GetRepresentation(Type type);
+        public abstract TKey GetBy(Guid guid);
     }
 }
