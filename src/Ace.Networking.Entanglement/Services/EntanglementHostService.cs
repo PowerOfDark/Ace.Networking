@@ -54,6 +54,11 @@ namespace Ace.Networking.Entanglement
 
             server.ClientDisconnected += Server_ClientDisconnected;
 
+            foreach (var obj in Objects)
+            {
+                obj.Value.Attach(server);
+            }
+
             server.OnRequest<ExecuteMethod>(OnRequestExecuteMethodResult);
             server.OnRequest<EntangleRequest>(OnRequestEntangle);
             server.OnRequest<UpdateRequest>(OnRequestUpdate);
@@ -68,6 +73,10 @@ namespace Ace.Networking.Entanglement
             server.OffRequest<ExecuteMethod>(OnRequestExecuteMethodResult);
             server.OffRequest<EntangleRequest>(OnRequestEntangle);
             server.OffRequest<UpdateRequest>(OnRequestUpdate);
+            foreach (var obj in Objects)
+            {
+                obj.Value.Detach();
+            }
 
         }
 
