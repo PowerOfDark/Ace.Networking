@@ -277,7 +277,7 @@ namespace Ace.Networking.Threading
                 var t = new Thread(WorkWrapper)
                 {
                     IsBackground = true,
-                }
+                };
                 var data = new ThreadData
                 {
                     Thread = t,
