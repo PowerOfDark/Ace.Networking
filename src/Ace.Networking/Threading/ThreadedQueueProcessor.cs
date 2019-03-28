@@ -274,7 +274,10 @@ namespace Ace.Networking.Threading
             var tick = MonitorTick;
             for (var i = 0; i < count; i++)
             {
-                var t = new Thread(WorkWrapper);
+                var t = new Thread(WorkWrapper)
+                {
+                    IsBackground = true,
+                }
                 var data = new ThreadData
                 {
                     Thread = t,
