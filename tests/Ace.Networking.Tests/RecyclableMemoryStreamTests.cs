@@ -69,9 +69,9 @@ namespace Ace.Networking.Tests
         {
             var stream = GetStream(2.0f, 128);
             stream.SetLength(127);
-            Assert.Equal(1, stream.Blocks.Count);
+            Assert.Single(stream.Blocks);
             stream.SetLength(0);
-            Assert.Equal(0, stream.Blocks.Count);
+            Assert.Empty(stream.Blocks);
         }
 
         [Fact]
@@ -81,9 +81,9 @@ namespace Ace.Networking.Tests
             stream.SetLength(1009);
             Assert.Equal(4, stream.Blocks.Count);
             stream.SetLength(1);
-            Assert.Equal(1, stream.Blocks.Count);
+            Assert.Single(stream.Blocks);
             stream.SetLength(0);
-            Assert.Equal(0, stream.Blocks.Count);
+            Assert.Empty(stream.Blocks);
         }
 
         [Fact]

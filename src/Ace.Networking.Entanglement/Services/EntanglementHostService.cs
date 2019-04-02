@@ -183,13 +183,16 @@ namespace Ace.Networking.Entanglement
 
         protected Guid? GetExistingEid(InterfaceEntry ie, IConnection scope = null)
         {
+            Guid id = Guid.Empty; 
+            //net461 incorrectly marks the above declaration as 'possibly uninitialized'
+
             if (ie.Access == EntanglementAccess.Scoped && scope != null &&
                 ScopedObjectMap.TryGetValue(scope, out var mapScoped) &&
-                (mapScoped?.TryGetValue(ie.InterfaceId, out var sEid) ?? false))
-                return sEid;
+                (mapScoped?.TryGetValue(ie.InterfaceId, out id) ?? false))
+                return id;
             if (ie.Access == EntanglementAccess.Global &&
-                GlobalObjectMap.TryGetValue(ie.InterfaceId, out var gEid))
-                return gEid;
+                GlobalObjectMap.TryGetValue(ie.InterfaceId, out id))
+                return id;
             return null;
         }
 

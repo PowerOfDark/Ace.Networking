@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Ace.Networking.Handlers;
 using Ace.Networking.Helpers;
+using Ace.Networking.Interfaces;
 using Ace.Networking.MicroProtocol;
 using Ace.Networking.MicroProtocol.Enums;
 using Ace.Networking.MicroProtocol.Headers;
@@ -173,6 +174,9 @@ namespace Ace.Networking
                     _sslStream = null;
                 }
             }
+
+            var wrapper = _services.Get<IInternalStreamWrapper>();
+            wrapper?.Wrap(_stream);
 
             Connected = true;
             if (UseCustomIncomingMessageQueue)
