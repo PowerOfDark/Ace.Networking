@@ -246,7 +246,7 @@ namespace Ace.Networking
         {
             try
             {
-                Socket.Shutdown(SocketShutdown.Both);
+                Socket?.Shutdown(SocketShutdown.Both);
             }
             catch
             {
