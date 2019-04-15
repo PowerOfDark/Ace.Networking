@@ -220,7 +220,8 @@ namespace Ace.Networking.Entanglement
                         ScopedObjectMap.TryAdd(scope, scopedMap);
                     }
 
-                    scopedMap.TryAdd(ie.InterfaceId, eid);
+                    if (!scopedMap.TryAdd(ie.InterfaceId, eid))
+                        return null;
                     break;
                 case EntanglementAccess.Global:
                     GlobalObjectMap[ie.InterfaceId] = eid;

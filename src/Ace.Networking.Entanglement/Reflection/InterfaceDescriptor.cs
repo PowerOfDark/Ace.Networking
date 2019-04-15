@@ -37,7 +37,7 @@ namespace Ace.Networking.Entanglement.Reflection
 
         public DynamicMethod HandlerDelegate;
         public Action<object, object[]> InvokerDelegate;
-        
+
     }
 
     public class PropertyDescriptor : IEqualityComparer<PropertyDescriptor>
@@ -110,32 +110,33 @@ namespace Ace.Networking.Entanglement.Reflection
 
         private void FillProperties(Type t, bool onlyVirtual = false)
         {
+            var flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy;
+            var seenProperties = new HashSet<PropertyInfo>();
+
+            void fillProperty(PropertyInfo p)
+            {
+                if (p.GetCustomAttribute<IgnoredAttribute>() != null) return;
+                if (!seenProperties.Add(p)) return;
+
+                if (!_properties.ContainsKey(p.Name))
+                    _properties[p.Name] = new PropertyDescriptor { Property = p };
+            }
+
             if (t.GetTypeInfo().IsInterface)
             {
-                var q = new Queue<Type>();
-                var seen = new HashSet<Type>();
-                q.Enqueue(t);
-                while (q.Any())
+                IterateInterfaces(t, current =>
                 {
-                    var current = q.Dequeue();
-                    foreach (var p in current.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                    foreach (var p in current.GetProperties(flags))
                     {
-                        if (p.GetCustomAttribute<IgnoredAttribute>() != null) continue;
-                        _properties[p.Name] = new PropertyDescriptor {Property = p};
+                        fillProperty(p);
                     }
+                });
 
-                    foreach (var i in t.GetInterfaces())
-                    {
-                        if (seen.Contains(i)) continue;
-                        q.Enqueue(i);
-                        seen.Add(current);
-                    }
-                }
 
                 return;
             }
 
-            var properties = t.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            var properties = t.GetProperties(flags);
 
             foreach (var p in properties)
             {
@@ -149,7 +150,7 @@ namespace Ace.Networking.Entanglement.Reflection
                     {
                     }
 
-                _properties[p.Name] = new PropertyDescriptor {Property = p};
+                _properties[p.Name] = new PropertyDescriptor { Property = p };
             }
         }
 
@@ -162,29 +163,41 @@ namespace Ace.Networking.Entanglement.Reflection
             return null;
         }
 
+        public static void IterateInterfaces(Type type, Action<Type> callback)
+        {
+            var q = new Queue<Type>();
+            var seen = new HashSet<Type>();
+            q.Enqueue(type);
+            while (q.Any())
+            {
+                var current = q.Dequeue();
+                callback.Invoke(current);
+                foreach (var i in current.GetInterfaces())
+                {
+                    if (seen.Contains(i)) continue;
+                    q.Enqueue(i);
+                    seen.Add(current);
+                }
+            }
+        }
+
         private void FillMethods(Type t)
         {
             var isInterface = t.GetTypeInfo().IsInterface;
-
+            var seenMethods = new HashSet<MethodInfo>();
             void fillMethod(MethodInfo m)
             {
                 if (m.IsGenericMethod || m.IsSpecialName || m.GetCustomAttribute<IgnoredAttribute>() != null) return;
-                var realRet = UnwrapTask(m.ReturnType);
+                if (!seenMethods.Add(m)) return;
 
-                /*if (realRet == null)
-                {
-                    if (isInterface)
-                        throw new InvalidCastException(
-                            "The entangled interface methods need to return either Task or Task<T>.");
-                    return;
-                }*/
+                var realRet = UnwrapTask(m.ReturnType);
 
                 LinkedList<MethodDescriptor> list;
 
                 if (!_methods.TryGetValue(m.Name, out var c))
                     _methods[m.Name] = list = new LinkedList<MethodDescriptor>();
                 else
-                    list = (LinkedList<MethodDescriptor>) c;
+                    list = (LinkedList<MethodDescriptor>)c;
 
 
                 list.AddLast(new MethodDescriptor
@@ -192,29 +205,20 @@ namespace Ace.Networking.Entanglement.Reflection
                     Method = m,
                     Parameters =
                         m.GetParameters().Select(p =>
-                            new ParameterDescriptor {IsOptional = p.IsOptional, Type = p.ParameterType}).ToArray(),
+                            new ParameterDescriptor { IsOptional = p.IsOptional, Type = p.ParameterType }).ToArray(),
                     RealReturnType = realRet ?? m.ReturnType,
                     IsAsync = realRet != null,
                 });
             }
 
-            var flags = BindingFlags.Instance | BindingFlags.Public;
+            var flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.FlattenHierarchy;
             if (isInterface)
             {
-                var q = new Queue<Type>();
-                var seen = new HashSet<Type>();
-                q.Enqueue(t);
-                while (q.Any())
+                IterateInterfaces(t, current =>
                 {
-                    var current = q.Dequeue();
-                    foreach (var m in current.GetMethods(flags)) fillMethod(m);
-                    foreach (var i in t.GetInterfaces())
-                    {
-                        if (seen.Contains(i)) continue;
-                        q.Enqueue(i);
-                        seen.Add(current);
-                    }
-                }
+                    foreach (var m in current.GetMethods(flags))
+                        fillMethod(m);
+                });
 
                 return;
             }
@@ -225,20 +229,30 @@ namespace Ace.Networking.Entanglement.Reflection
 
         private void FillEvents(Type t)
         {
+            var seenEvents = new HashSet<EventInfo>();
             var events = t.GetEvents();
 
-            foreach(var ev in events)
+            void fillEvent(EventInfo e)
             {
-                if (ev.GetCustomAttribute<IgnoredAttribute>() != null) continue;
+                if (e.GetCustomAttribute<IgnoredAttribute>() != null) return;
+                if (!seenEvents.Add(e)) return;
+
                 EventDescriptor desc;
-                _events.Add(ev.Name, desc = new EventDescriptor()
+                _events.Add(e.Name, desc = new EventDescriptor()
                 {
-                    Event = ev,
-                    InvokeMethod = ev.EventHandlerType?.GetMethod("Invoke"),
+                    Event = e,
+                    InvokeMethod = e.EventHandlerType?.GetMethod("Invoke"),
                 });
                 desc.Parameters = desc.InvokeMethod?.GetParameters().Select(p =>
-                    new ParameterDescriptor() {IsOptional = p.IsOptional, Type = p.ParameterType}).ToArray();
+                    new ParameterDescriptor() { IsOptional = p.IsOptional, Type = p.ParameterType }).ToArray();
             }
+
+            IterateInterfaces(t, current =>
+            {
+                foreach (var e in current.GetEvents(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy))
+                    fillEvent(e);
+            });
+
 
         }
 
