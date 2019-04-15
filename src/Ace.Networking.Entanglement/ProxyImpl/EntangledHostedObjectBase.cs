@@ -43,6 +43,8 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             }
         }
 
+        private volatile bool _initialized = false;
+
         private readonly HashSet<InternalPropertyData> _pendingUpdates = new HashSet<InternalPropertyData>();
         protected object _sync = new object();
 
@@ -50,9 +52,40 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             new Dictionary<string, InternalPropertyData>();
 
 
+        private void _initialize()
+        {
+            lock (_sync)
+            {
+                if (_initialized) return;
+                _initialized = true;
+                foreach (var evkv in _Descriptor.Events)
+                {
+                    if (evkv.Key == "PropertyChanged")
+                        continue;
+                    var ev = evkv.Value;
+                    if (ev.HandlerDelegate == null)
+                        _Descriptor.AddEventHandlerDelegate(ev, typeof(EntangledHostedObjectBase));
+                    ev.Event.AddEventHandler(this, ev.HandlerDelegate.CreateDelegate(ev.Event.EventHandlerType, this));
+                }
+
+                foreach (var ml in _Descriptor.Methods)
+                {
+                    foreach (var method in ml.Value)
+                    {
+                        if (method.InvokerDelegate == null)
+                            _Descriptor.AddMethodDelegate(method);
+                    }
+                }
+            }
+
+            PropertyChanged += EntangledHostedObjectBase_PropertyChanged;
+        }
+
         public void Attach(ICommon host)
         {
             if (host == null) return;
+            if (!_initialized)
+                _initialize();
             lock (_sync)
             {
                 _Context = new EntanglementProviderContext(host);
@@ -82,29 +115,6 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             _Descriptor = i;
 
             Attach(host);
-            lock (_sync)
-            {
-
-
-                foreach (var evkv in _Descriptor.Events)
-                {
-                    var ev = evkv.Value;
-                    if (ev.HandlerDelegate == null)
-                        _Descriptor.AddEventHandlerDelegate(ev, typeof(EntangledHostedObjectBase));
-                    ev.Event.AddEventHandler(this, ev.HandlerDelegate.CreateDelegate(ev.Event.EventHandlerType, this));
-                }
-
-                foreach (var ml in _Descriptor.Methods)
-                {
-                    foreach (var method in ml.Value)
-                    {
-                        if (method.InvokerDelegate == null)
-                            _Descriptor.AddMethodDelegate(method);
-                    }
-                }
-            }
-
-            PropertyChanged += EntangledHostedObjectBase_PropertyChanged;
         }
 
         internal void OnEvent(string name, object[] args)
