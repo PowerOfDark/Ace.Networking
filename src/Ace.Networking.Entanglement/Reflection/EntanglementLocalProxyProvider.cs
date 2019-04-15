@@ -141,7 +141,7 @@ namespace Ace.Networking.Entanglement.Reflection
 
             foreach (var ev in desc.Events)
             {
-                type.ImplementEvent(typeInfo, ev.Key);
+                type.ImplementEvent(ev.Value.Event.DeclaringType.GetTypeInfo(), ev.Key);
             }
 
 
