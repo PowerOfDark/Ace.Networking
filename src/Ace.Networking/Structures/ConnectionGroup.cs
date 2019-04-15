@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Ace.Networking.Handlers;
 using Ace.Networking.Serializers;
+using Ace.Networking.Services;
 using Ace.Networking.Threading;
 using Ace.Networking.TypeResolvers;
 
@@ -20,6 +21,7 @@ namespace Ace.Networking.Structures
 
         public IReadOnlyCollection<IConnection> Clients => _clients;
         public ICommon Host { get; }
+        public IServiceManager Services => Host.Services;
         public ITypeResolver TypeResolver => Host?.TypeResolver;
         public IPayloadSerializer Serializer => Host?.Serializer;
         public event Connection.InternalPayloadDispatchHandler DispatchPayload;

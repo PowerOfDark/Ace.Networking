@@ -140,7 +140,7 @@ namespace Ace.Networking
 
         public IPayloadSerializer Serializer => _encoder?.Serializer ?? _decoder?.Serializer;
         public ITypeResolver TypeResolver => Serializer.TypeResolver;
-        public IServiceManager<IConnection> Services => _services;
+        public IServiceManager Services => _services;
 
         public long Identifier { get; }
         public Guid Guid { get; }

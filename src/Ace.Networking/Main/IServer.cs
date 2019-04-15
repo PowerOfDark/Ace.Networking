@@ -2,7 +2,7 @@
 
 namespace Ace.Networking
 {
-    public interface IServer : ICommon, IServiceContainer<IServer>
+    public interface IServer : ICommon
     {
         event TcpServer.ClientAcceptedHandler ClientAccepted;
         //event Connection.InternalPayloadDispatchHandler DispatchPayload;

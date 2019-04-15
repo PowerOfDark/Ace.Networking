@@ -9,20 +9,20 @@ namespace Ace.Networking.Services
     {
         private readonly Dictionary<Type, Delegate> _pendingConfigs = new Dictionary<Type, Delegate>();
 
-        private readonly Dictionary<Type, DependencyResolver.DependencyEntry<IService<TInterface>>>
-            _servicesMap = new Dictionary<Type, DependencyResolver.DependencyEntry<IService<TInterface>>>();
+        private readonly Dictionary<Type, DependencyResolver.DependencyEntry<object>>
+            _servicesMap = new Dictionary<Type, DependencyResolver.DependencyEntry<object>>();
 
 
         public IReadOnlyDictionary<Type, IService<TInterface>> Services => throw new NotSupportedException();
 
 
         public IServicesBuilder<TInterface> Add<TBase, T>(T instance, Action<T> config = null)
-            where T : class, TBase where TBase : class, IService<TInterface>
+            where T : class, TBase where TBase : class
         {
             //if (config != null && instance == null)
             //    throw new NotSupportedException("Config action is not supported in ResolvingServicesBuilder");
             _servicesMap.Add(typeof(TBase),
-                new DependencyResolver.DependencyEntry<IService<TInterface>>(typeof(T), instance));
+                new DependencyResolver.DependencyEntry<object>(typeof(T), instance));
             if (instance != null)
                 config?.Invoke(instance);
             else if (config != null) _pendingConfigs[typeof(T)] = config;
@@ -31,10 +31,10 @@ namespace Ace.Networking.Services
         }
 
         public IServicesBuilder<TInterface> Add<TBase, T>()
-            where T : class, TBase where TBase : class, IService<TInterface>
+            where T : class, TBase where TBase : class
         {
             _servicesMap.Add(typeof(TBase),
-                new DependencyResolver.DependencyEntry<IService<TInterface>>(typeof(T), null));
+                new DependencyResolver.DependencyEntry<object>(typeof(T), null));
             return this;
         }
 

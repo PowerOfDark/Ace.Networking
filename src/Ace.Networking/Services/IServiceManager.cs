@@ -2,8 +2,8 @@
 
 namespace Ace.Networking.Services
 {
-    public interface IServiceManager<TInterface> where TInterface : class, ICommon
+    public interface IServiceManager
     {
-        T Get<T>() where T : class, IService<TInterface>;
+        T Get<T>() where T : class;
     }
 }

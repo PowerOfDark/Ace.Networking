@@ -2,10 +2,12 @@
 
 namespace Ace.Networking.Services
 {
-    public interface IService<in T> where T : class, ICommon
+    public interface IServiceBase
     {
         bool IsActive { get; }
-
+    }
+    public interface IService<T> : IServiceBase where T: class, ICommon
+    {
         void Attach(T server);
         void Detach(T server);
     }

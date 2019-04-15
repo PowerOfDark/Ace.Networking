@@ -2,7 +2,7 @@
 
 namespace Ace.Networking.Services
 {
-    public interface IConnectionService : IService<IConnection>
+    public interface IConnectionService : IService <IConnection>
     {
     }
 }

@@ -6,14 +6,14 @@ namespace Ace.Networking.Services
 {
     public class ServicesBuilder<TInterface> : IServicesBuilder<TInterface> where TInterface : class, ICommon
     {
-        private readonly Dictionary<Type, IService<TInterface>>
-            _services = new Dictionary<Type, IService<TInterface>>();
+        private readonly Dictionary<Type, object>
+            _services = new Dictionary<Type, object>();
 
-        public IReadOnlyDictionary<Type, IService<TInterface>> Services => _services;
+        public IReadOnlyDictionary<Type, object> Services => _services;
 
 
         public IServicesBuilder<TInterface> Add<TBase, T>(T instance, Action<T> config = null)
-            where T : class, TBase where TBase : class, IService<TInterface>
+            where T : class, TBase where TBase : class
         {
             _services.Add(typeof(TBase), instance);
             config?.Invoke(instance);
@@ -21,7 +21,7 @@ namespace Ace.Networking.Services
         }
 
         public IServicesBuilder<TInterface> Add<TBase, T>()
-            where T : class, TBase where TBase : class, IService<TInterface>
+            where T : class, TBase where TBase : class
         {
             Add<TBase, T>(Activator.CreateInstance<T>());
             return this;

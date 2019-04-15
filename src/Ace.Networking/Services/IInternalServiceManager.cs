@@ -2,7 +2,7 @@
 
 namespace Ace.Networking.Services
 {
-    public interface IInternalServiceManager<T> : IServiceManager<T>, IAttachable<T> where T : class, ICommon
+    public interface IInternalServiceManager<T> : IServiceManager, IAttachable<T> where T : class, ICommon
     {
     }
 }

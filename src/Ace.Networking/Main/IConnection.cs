@@ -9,7 +9,7 @@ using Ace.Networking.Structures;
 
 namespace Ace.Networking
 {
-    public interface IConnection : IConnectionInterface, IServiceContainer<IConnection>, ISslContainer
+    public interface IConnection : IConnectionInterface, ISslContainer
     {
         long Identifier { get; }
         Guid Guid { get; }

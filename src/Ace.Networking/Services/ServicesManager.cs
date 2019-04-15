@@ -8,35 +8,65 @@ namespace Ace.Networking.Services
     {
         public static ServicesManager<TInterface> Empty = new ServicesManager<TInterface>();
 
-        protected IReadOnlyDictionary<Type, IService<TInterface>> Services =
-            new Dictionary<Type, IService<TInterface>>();
+        protected IReadOnlyDictionary<Type, object> Services =
+            new Dictionary<Type, object>();
 
         protected ServicesManager()
         {
         }
 
-        public ServicesManager(IDictionary<Type, IService<TInterface>> services)
+        public ServicesManager(IDictionary<Type, object> services)
         {
-            Services = new Dictionary<Type, IService<TInterface>>(services);
+            Services = new Dictionary<Type, object>(services);
         }
 
-        public void Attach(TInterface server)
-        {
-            lock (Services)
-            {
-                foreach (var service in Services) service.Value.Attach(server);
-            }
-        }
-
-        public void Detach(TInterface server)
+        public void Attach(TInterface client)
         {
             lock (Services)
             {
-                foreach (var service in Services) service.Value.Detach(server);
+                foreach (var kv in Services)
+                {
+                    var service = kv.Value;
+                    if(service is IService<ICommon> icommon)
+                    {
+                        icommon.Attach(client);
+                    }
+                    else if(service is IService<IServer> iserver && client is IServer server)
+                    {
+                        iserver.Attach(server);
+                    }
+                    else if(service is IService<IConnection> icon && client is IConnection con)
+                    {
+                        icon.Attach(con);
+                    }
+                }
             }
         }
 
-        public T Get<T>() where T : class, IService<TInterface>
+        public void Detach(TInterface client)
+        {
+            lock (Services)
+            {
+                foreach (var kv in Services)
+                {
+                    var service = kv.Value;
+                    if (service is IService<ICommon> icommon)
+                    {
+                        icommon.Detach(client);
+                    }
+                    else if (service is IService<IServer> iserver && client is IServer server)
+                    {
+                        iserver.Detach(server);
+                    }
+                    else if (service is IService<IConnection> icon && client is IConnection con)
+                    {
+                        icon.Detach(con);
+                    }
+                }
+            }
+        }
+
+        public T Get<T>() where T : class
         {
             if (!Services.TryGetValue(typeof(T), out var s)) return null;
             return (T) s;

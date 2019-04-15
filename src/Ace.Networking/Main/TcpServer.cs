@@ -85,7 +85,7 @@ namespace Ace.Networking
 
         public ITypeResolver TypeResolver => ConnectionBuilder?.GetTypeResolver();
         public IPayloadSerializer Serializer => ConnectionBuilder?.GetSerializer();
-        public IServiceManager<IServer> Services => _services;
+        public IServiceManager Services => _services;
         public event ClientAcceptedHandler ClientAccepted;
         public event Connection.DisconnectHandler ClientDisconnected;
         public event GlobalPayloadHandler PayloadReceived;
