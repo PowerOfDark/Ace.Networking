@@ -20,14 +20,17 @@ namespace Ace.Networking.Entanglement.Reflection
         {
             EntangledTypeProxyDescriptor desc;
             var guid = typeof(T).GetTypeInfo().GUID;
-            if (!GeneratedTypes.TryGetValue(guid, out desc))
+            lock (GeneratedTypes)
             {
-                desc = ConstructLocalProxy<T>();
-                GeneratedTypes.TryAdd(guid, desc);
+                if (!GeneratedTypes.TryGetValue(guid, out desc))
+                {
+                    desc = ConstructLocalProxy<T>();
+                    GeneratedTypes.TryAdd(guid, desc);
+                }
             }
 
 
-            var obj = (EntangledLocalObjectBase) Activator.CreateInstance(desc.GeneratedType, host, eid,
+            var obj = (EntangledLocalObjectBase)Activator.CreateInstance(desc.GeneratedType, host, eid,
                 desc.Interface);
             return obj;
         }
@@ -62,49 +65,49 @@ namespace Ace.Networking.Entanglement.Reflection
             type.FillBaseConstructors(elo);
 
             foreach (var methods in desc.Methods)
-            foreach (var method in methods.Value)
-            {
-                var parameters = method.Method.GetParameters();
-                var m = type.DefineMethod(method.Method.Name, MethodAttributes.Public | MethodAttributes.Virtual,
-                    method.Method.CallingConvention, method.Method.ReturnType,
-                    method.Method.GetParameters().Select(p => p.ParameterType).ToArray());
-                var i = m.GetILGenerator();
-
-                i.Emit(OpCodes.Ldarg_0);
-                i.Emit(OpCodes.Ldstr, method.Method.Name);
-
-                //emit the object[] array to hold the parameters
-
-                if ((parameters?.Length ?? 0) == 0)
+                foreach (var method in methods.Value)
                 {
-                    i.Emit(OpCodes.Ldnull);
-                }
-                else
-                {
-                    i.EmitLdci4((byte) parameters.Length);
-                    i.Emit(OpCodes.Newarr, typeof(object));
-                    for (byte l = 0; l < parameters.Length; l++)
+                    var parameters = method.Method.GetParameters();
+                    var m = type.DefineMethod(method.Method.Name, MethodAttributes.Public | MethodAttributes.Virtual,
+                        method.Method.CallingConvention, method.Method.ReturnType,
+                        method.Method.GetParameters().Select(p => p.ParameterType).ToArray());
+                    var i = m.GetILGenerator();
+
+                    i.Emit(OpCodes.Ldarg_0);
+                    i.Emit(OpCodes.Ldstr, method.Method.Name);
+
+                    //emit the object[] array to hold the parameters
+
+                    if ((parameters?.Length ?? 0) == 0)
                     {
-                        i.Emit(OpCodes.Dup);
-                        i.EmitLdci4(l);
-                        i.EmitLdarg((byte) (l + 1));
-                        if (parameters[l].ParameterType.GetTypeInfo().IsValueType)
-                            i.Emit(OpCodes.Box, parameters[l].ParameterType);
-
-                        i.Emit(OpCodes.Stelem_Ref);
+                        i.Emit(OpCodes.Ldnull);
                     }
+                    else
+                    {
+                        i.EmitLdci4((byte)parameters.Length);
+                        i.Emit(OpCodes.Newarr, typeof(object));
+                        for (byte l = 0; l < parameters.Length; l++)
+                        {
+                            i.Emit(OpCodes.Dup);
+                            i.EmitLdci4(l);
+                            i.EmitLdarg((byte)(l + 1));
+                            if (parameters[l].ParameterType.GetTypeInfo().IsValueType)
+                                i.Emit(OpCodes.Box, parameters[l].ParameterType);
+
+                            i.Emit(OpCodes.Stelem_Ref);
+                        }
+                    }
+
+                    if (method.RealReturnType == typeof(void))
+                        i.Emit(OpCodes.Call, method.IsAsync ? executeMethodVoid : executeMethodVoidSync);
+                    else
+                        i.Emit(OpCodes.Call, (method.IsAsync ? executeMethod : executeMethodSync).MakeGenericMethod(method.RealReturnType));
+
+                    i.Emit(OpCodes.Ret);
+
+                    //important: OVERRIDE THE INTERFACE [abstract] IMPLEMENTATION
+                    type.DefineMethodOverride(m, method.Method);
                 }
-                
-                if (method.RealReturnType == typeof(void))
-                    i.Emit(OpCodes.Call, method.IsAsync ? executeMethodVoid : executeMethodVoidSync);
-                else
-                    i.Emit(OpCodes.Call, (method.IsAsync ? executeMethod : executeMethodSync).MakeGenericMethod(method.RealReturnType));
-
-                i.Emit(OpCodes.Ret);
-
-                //important: OVERRIDE THE INTERFACE [abstract] IMPLEMENTATION
-                type.DefineMethodOverride(m, method.Method);
-            }
 
             //implement getters
 
@@ -146,7 +149,7 @@ namespace Ace.Networking.Entanglement.Reflection
 
 
             var result =
-                new EntangledTypeProxyDescriptor {GeneratedType = type.CreateTypeInfo().AsType(), Interface = desc};
+                new EntangledTypeProxyDescriptor { GeneratedType = type.CreateTypeInfo().AsType(), Interface = desc };
 
             foreach (var ev in desc.Events)
             {
@@ -198,7 +201,7 @@ namespace Ace.Networking.Entanglement.Reflection
             il.Emit(OpCodes.Call, ev.InvokeMethod);
             il.MarkLabel(mRet);
             il.Emit(OpCodes.Ret);
-            return (Action<object,object[]>)dm.CreateDelegate(typeof(Action<object, object[]>));
+            return (Action<object, object[]>)dm.CreateDelegate(typeof(Action<object, object[]>));
         }
     }
 }
