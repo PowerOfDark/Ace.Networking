@@ -152,7 +152,7 @@ namespace Ace.Networking.Threading
                         _freeze = true;
                         _modifyHandle.Reset();
                         var count = SendQueues.Take(currentThreadCount).Select(t => t.Count).ToList();
-                        for (var i = 0; i < tc; i++)
+                        for (var i = 0; i < currentThreadCount; i++)
                         {
                             var items = count[i];
                             var q = SendQueues[i];
