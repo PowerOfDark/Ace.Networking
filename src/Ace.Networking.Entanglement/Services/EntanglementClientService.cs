@@ -53,6 +53,8 @@ namespace Ace.Networking.Entanglement
 
         public async Task<T> Entangle<T>(Guid? eid = null) where T : class/*, IEntangledObject*/
         {
+            if (_connection == null)
+                return null;
             var typeInfo = typeof(T).GetTypeInfo();
             if (!typeInfo.IsInterface || !typeInfo.IsPublic)
                 throw new ArgumentException("The request type must be a public interface");
