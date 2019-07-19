@@ -45,7 +45,7 @@ namespace Ace.Networking.Entanglement
         {
             if (BoundInterfaces.Contains(server)) return;
             if (BoundInterfaces.Any())
-                throw new NotSupportedException("Only single host is allowed");
+                (this as IService<ICommon>).Detach(BoundInterfaces.FirstOrDefault());    
 
             BoundInterfaces.Add(server);
 
