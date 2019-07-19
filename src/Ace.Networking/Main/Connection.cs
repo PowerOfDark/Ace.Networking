@@ -603,7 +603,7 @@ namespace Ace.Networking
             if (Socket == null || !Connected) throw new SocketException((int) SocketError.NotInitialized);
 
             _payloadPending = msg.GetPayload();
-            _payloadPendingType = _payloadPending.GetType();
+            _payloadPendingType = _payloadPending?.GetType() ?? typeof(object);
             //_sendLock.Wait();
             _encoder.Prepare(msg);
             bool isComplete;
