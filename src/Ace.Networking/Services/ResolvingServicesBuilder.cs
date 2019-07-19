@@ -12,29 +12,22 @@ namespace Ace.Networking.Services
         private readonly Dictionary<Type, DependencyResolver.DependencyEntry<object>>
             _servicesMap = new Dictionary<Type, DependencyResolver.DependencyEntry<object>>();
 
+        private readonly Dictionary<Type, Func<object>> _factories = new Dictionary<Type, Func<object>>();
 
-        public IReadOnlyDictionary<Type, IService<TInterface>> Services => throw new NotSupportedException();
-
-
-        public IServicesBuilder<TInterface> Add<TBase, T>(T instance, Action<T> config = null)
+        public IServicesBuilder<TInterface> AddInstance<TBase, T>(T instance, Action<T> config = null)
             where T : class, TBase where TBase : class
         {
-            //if (config != null && instance == null)
-            //    throw new NotSupportedException("Config action is not supported in ResolvingServicesBuilder");
             _servicesMap.Add(typeof(TBase),
                 new DependencyResolver.DependencyEntry<object>(typeof(T), instance));
-            if (instance != null)
-                config?.Invoke(instance);
-            else if (config != null) _pendingConfigs[typeof(T)] = config;
+            _pendingConfigs[typeof(T)] = config;
 
             return this;
         }
 
-        public IServicesBuilder<TInterface> Add<TBase, T>()
+        public IServicesBuilder<TInterface> AddInstance<TBase, T>(Action<T> config)
             where T : class, TBase where TBase : class
         {
-            _servicesMap.Add(typeof(TBase),
-                new DependencyResolver.DependencyEntry<object>(typeof(T), null));
+            AddInstance<TBase, T>(Activator.CreateInstance<T>(), config);
             return this;
         }
 
@@ -42,11 +35,26 @@ namespace Ace.Networking.Services
         {
             if ((_servicesMap?.Count ?? 0) == 0) return ServicesManager<TInterface>.Empty;
 
-            var res = DependencyResolver.Resolve(_servicesMap);
+            var res = DependencyResolver.Resolve(_servicesMap, _factories);
             foreach (var r in res)
                 if (_pendingConfigs.TryGetValue(r.Value.GetType(), out var d))
-                    d.DynamicInvoke(r.Value);
+                    d?.DynamicInvoke(r.Value);
             return new ServicesManager<TInterface>(res);
+        }
+
+        public IServicesBuilder<TInterface> Add<TBase, T>(Func<T> factory, Action<T> config = null) where T : class, TBase where TBase : class
+        {
+            _factories.Add(typeof(TBase), factory);
+            _pendingConfigs[typeof(T)] = config;
+            return this;
+        }
+
+        public IServicesBuilder<TInterface> Add<TBase, T>(Action<T> config = null) where T : class, TBase where TBase : class
+        {
+            _servicesMap.Add(typeof(TBase),
+                new DependencyResolver.DependencyEntry<object>(typeof(T), null));
+            _pendingConfigs[typeof(T)] = config;
+            return this;
         }
     }
 }

@@ -7,13 +7,26 @@ namespace Ace.Networking.Helpers
 {
     public class DependencyResolver
     {
-        public static IDictionary<Type, T> Resolve<T>(IDictionary<Type, DependencyEntry<T>> map) where T : class
+        public static IDictionary<Type, T> Resolve<T>(IDictionary<Type, DependencyEntry<T>> map, IDictionary<Type, Func<T>> factories = null) where T : class
         {
             var res = new Dictionary<Type, T>(map.Count);
             foreach (var kv in map)
                 if (kv.Value.Instance != null)
                     res.Add(kv.Key, kv.Value.Instance);
-
+            if(factories != null)
+                foreach (var factory in factories)
+                {
+                    try
+                    {
+                        if (res.TryGetValue(factory.Key, out var inst) && inst != null)
+                            continue;
+                        res.Add(factory.Key, factory.Value.Invoke());
+                    }
+                    catch
+                    {
+                        //ignored
+                    }
+                }
             void Traverse(Type source)
             {
                 var toVisit = new Stack<Type>();

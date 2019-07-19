@@ -9,29 +9,62 @@ namespace Ace.Networking.Services
         private readonly Dictionary<Type, object>
             _services = new Dictionary<Type, object>();
 
-        public IReadOnlyDictionary<Type, object> Services => _services;
+        private readonly Dictionary<Type, Delegate> 
+            _pendingConfigs = new Dictionary<Type, Delegate>();
 
+        private readonly Dictionary<Type, Func<object>>
+            _factories = new Dictionary<Type, Func<object>>();
 
-        public IServicesBuilder<TInterface> Add<TBase, T>(T instance, Action<T> config = null)
+        public IServicesBuilder<TInterface> AddInstance<TBase, T>(T instance, Action<T> config = null)
             where T : class, TBase where TBase : class
         {
             _services.Add(typeof(TBase), instance);
-            config?.Invoke(instance);
+            _pendingConfigs[typeof(T)] = config;
             return this;
         }
 
-        public IServicesBuilder<TInterface> Add<TBase, T>()
+        public IServicesBuilder<TInterface> AddInstance<TBase, T>(Action<T> config = null)
             where T : class, TBase where TBase : class
         {
-            Add<TBase, T>(Activator.CreateInstance<T>());
+            AddInstance<TBase, T>(Activator.CreateInstance<T>(), config);
+            return this;
+        }
+
+        public IServicesBuilder<TInterface> Add<TBase, T>(Func<T> factory, Action<T> config = null)
+            where T : class, TBase where TBase : class
+        {
+            _factories.Add(typeof(TBase), factory);
+            _pendingConfigs[typeof(T)] = config;
+            return this;
+        }
+
+        public IServicesBuilder<TInterface> Add<TBase, T>(Action<T> config = null)
+            where T : class, TBase where TBase : class
+        {
+            _factories.Add(typeof(TBase), Activator.CreateInstance<T>);
+            _pendingConfigs[typeof(T)] = config;
             return this;
         }
 
         public IInternalServiceManager<TInterface> Build()
         {
             if ((_services?.Count ?? 0) == 0) return ServicesManager<TInterface>.Empty;
-
-            return new ServicesManager<TInterface>(_services);
+            var services = new Dictionary<Type, object>(_services);
+            foreach (var factory in _factories)
+            {
+                try
+                {
+                    services.Add(factory.Key, factory.Value.Invoke());
+                }
+                catch
+                {
+                    //ignored
+                }
+            }
+            foreach(var res in services)
+                if (_pendingConfigs.TryGetValue(res.Value.GetType(), out var d))
+                    d?.DynamicInvoke(res.Value);
+            return new ServicesManager<TInterface>(services);
         }
     }
 }
