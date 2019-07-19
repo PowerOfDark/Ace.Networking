@@ -297,7 +297,7 @@ namespace Ace.Networking.Threading
             if (_killing || _freeze) _modifyHandle.WaitOne();
             if (_pending > Parameters.QueueCapacity) _enqueueHandle.WaitOne();
 
-            var i = Math.Abs(discriminator % ThreadCount);
+            var i = (ushort)Math.Abs(discriminator % ThreadCount);
             SendQueues[i].Enqueue(new ThreadedQueueItem<TItem> {Item = item, Discriminator = (ushort) discriminator});
             Interlocked.Increment(ref _pending);
             ThreadList[i].WaitHandle.Set();
