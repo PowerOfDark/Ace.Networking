@@ -48,7 +48,6 @@ namespace Ace.Networking.Services
 
         public IInternalServiceManager<TInterface> Build()
         {
-            if ((_services?.Count ?? 0) == 0) return ServicesManager<TInterface>.Empty;
             var services = new Dictionary<Type, object>(_services);
             foreach (var factory in _factories)
             {

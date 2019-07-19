@@ -33,8 +33,6 @@ namespace Ace.Networking.Services
 
         public IInternalServiceManager<TInterface> Build()
         {
-            if ((_servicesMap?.Count ?? 0) == 0) return ServicesManager<TInterface>.Empty;
-
             var res = DependencyResolver.Resolve(_servicesMap, _factories);
             foreach (var r in res)
                 if (_pendingConfigs.TryGetValue(r.Value.GetType(), out var d))
