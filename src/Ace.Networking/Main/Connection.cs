@@ -75,7 +75,7 @@ namespace Ace.Networking
         private Thread _sendWorkerThread;
         private volatile bool _sendWorkerThreadRunning;
 
-        private SslStream _sslStream;
+        private Stream _sslStream;
 
         private Stream _stream;
         private SocketBuffer _writeBuffer;
@@ -176,9 +176,12 @@ namespace Ace.Networking
             }
 
             var wrapper = _services.Get<IInternalStreamWrapper>();
-            wrapper?.Wrap(_stream);
+            _sslStream = wrapper?.Wrap(Stream);
 
             Connected = true;
+            LastReceived = DateTime.Now;
+            _services.Attach(this);
+
             if (UseCustomIncomingMessageQueue)
             {
                 _decoder.PacketReceived = DispatchPayloadReceived;
@@ -209,9 +212,6 @@ namespace Ace.Networking
                 _receiveWorkerThread.Start();
 #endif
             }
-
-            LastReceived = DateTime.Now;
-            _services.Attach(this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
