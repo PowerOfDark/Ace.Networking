@@ -197,7 +197,7 @@ namespace Ace.Networking
                 if (!_sendWorkerThreadRunning)
                 {
                     _sendWorkerThreadRunning = true;
-                    _sendWorkerThread = new Thread(SendWorker) {IsBackground = false};
+                    _sendWorkerThread = new Thread(SendWorker) {IsBackground = true};
                     _sendWorkerThread.Start();
                 }
             }
@@ -208,7 +208,7 @@ namespace Ace.Networking
 #if ReadAsync_Test
                 ReadAsync().ConfigureAwait(false);
 #else
-                _receiveWorkerThread = new Thread(ReadSync) {IsBackground = false};
+                _receiveWorkerThread = new Thread(ReadSync) {IsBackground = true};
                 _receiveWorkerThread.Start();
 #endif
             }
