@@ -230,11 +230,8 @@ namespace Ace.Networking.MicroProtocol
                 }
                 else
                 {
-                    byte[] contentType = PayloadSerializerBase.NullSerializer;
-                    if (_message != null)
-                    {
-                        Serializer.Serialize(_message, _bodyStream, out contentType);
-                    }
+                    byte[] contentType = null;
+                    Serializer.Serialize(_message, _bodyStream, out contentType);
                     content.ContentType = contentType;
                     content.ContentLength = new int[1] {checked((int) (_bodyStream.Position - pos))};
                 }
