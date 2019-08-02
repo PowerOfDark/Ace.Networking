@@ -437,7 +437,7 @@ namespace Ace.Networking
 
             if (!handled && unboxedRequest.HasValue)
                 EnqueueSendPacket(new TrackablePacket<object>(
-                    new TrackableHeader(unboxedRequest.Value, PacketFlag.IsResponse | PacketFlag.NoContent), null));
+                    new TrackableHeader(unboxedRequest.Value, PacketFlag.IsResponse), null));
 
             //TODO: Inconsistencies
             // Order:
@@ -600,37 +600,47 @@ namespace Ace.Networking
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SendSync(IPreparedPacket msg, TaskCompletionSource<object> sendCompletionSource)
         {
-            if (Socket == null || !Connected) throw new SocketException((int) SocketError.NotInitialized);
-
-            _payloadPending = msg.GetPayload();
-            _payloadPendingType = _payloadPending?.GetType() ?? typeof(object);
-            //_sendLock.Wait();
-            _encoder.Prepare(msg);
-            bool isComplete;
-            var err = false;
-            do
+            try
             {
-                try
-                {
-                    _encoder.Send(_writeBuffer);
-                    /* Important: this.Stream returns the SSL or basic stream */
-                    Stream.Write(_writeBuffer.Buffer, _writeBuffer.Offset, _writeBuffer.Count);
-                    isComplete = _encoder.OnSendCompleted(_writeBuffer.Count);
-                }
-                catch (Exception ex)
-                {
-                    HandleRemoteDisconnect(SocketError.SocketError, ex);
-                    err = true;
-                    break;
-                }
-            } while (!isComplete);
+                _sendLock.Wait();
+                if (Socket == null || !Connected) throw new SocketException((int)SocketError.NotInitialized);
 
-            if (!err)
-            {
-                //_sendLock.Release();
-                sendCompletionSource?.TrySetResult(_payloadPending);
-                PayloadSent?.Invoke(this, _payloadPending, _payloadPendingType);
+                _payloadPending = msg.GetPayload();
+                _payloadPendingType = _payloadPending?.GetType() ?? typeof(object);
+
+                _encoder.Prepare(msg);
+                bool isComplete;
+                var err = false;
+                do
+                {
+                    try
+                    {
+                        _encoder.Send(_writeBuffer);
+                        /* Important: this.Stream returns the SSL or basic stream */
+
+                        Stream.Write(_writeBuffer.Buffer, _writeBuffer.Offset, _writeBuffer.Count);
+                        isComplete = _encoder.OnSendCompleted(_writeBuffer.Count);
+                    }
+                    catch (Exception ex)
+                    {
+                        HandleRemoteDisconnect(SocketError.SocketError, ex);
+                        err = true;
+                        break;
+                    }
+                } while (!isComplete);
+
+                if (!err)
+                {
+                    //_sendLock.Release();
+                    sendCompletionSource?.TrySetResult(_payloadPending);
+                    PayloadSent?.Invoke(this, _payloadPending, _payloadPendingType);
+                }
             }
+            finally
+            {
+                _sendLock.Release();
+            }
+
         }
 
         /// <summary>
