@@ -8,7 +8,7 @@ namespace Ace.Networking.Serializers
 {
     public abstract class PayloadSerializerBase : IPayloadSerializer
     {
-        public static readonly byte[] NullSerializer = {0x0};
+        public static readonly byte[] NullSerializer = { 0x0 };
 
         public PayloadSerializerBase(ITypeResolver typeResolver)
         {
@@ -21,12 +21,6 @@ namespace Ace.Networking.Serializers
 
         public virtual object Deserialize(byte[] contentType, Stream source, out Type resolvedType)
         {
-
-            if (SequenceEqual(NullSerializer, contentType))
-            {
-                resolvedType = typeof(object);
-                return null;
-            }
             if (!IsValidContentType(contentType)) throw new InvalidDataException(nameof(contentType));
             if (!TypeResolver.TryResolve(source, out resolvedType)) throw new InvalidDataException("type");
             var ret = DeserializeType(resolvedType, source);
@@ -38,14 +32,8 @@ namespace Ace.Networking.Serializers
 
         public virtual void Serialize(object source, Stream destination, out byte[] contentType)
         {
-            
             contentType = SupportedContentType;
-            if (source == null)
-            {
-                contentType = NullSerializer;
-                return;
-            }
-            if (!TypeResolver.TryWrite(destination, source.GetType()))
+            if (!TypeResolver.TryWrite(destination, source?.GetType() ?? typeof(object)))
                 throw new InvalidOperationException($"no type resolver can handle the specified type");
             var l = source as ISerializationListener;
             l?.PreSerialize(this, destination);
@@ -66,7 +54,7 @@ namespace Ace.Networking.Serializers
         {
             if (supportedContentType.Length != contentType.Length) return false;
             for (var i = 0; i < supportedContentType.Length; i++)
-                if (supportedContentType[i] != contentType[i])
+                if (SupportedContentType[i] != contentType[i])
                     return false;
             return true;
         }

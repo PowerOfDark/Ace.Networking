@@ -49,12 +49,12 @@ namespace Ace.Networking
             new ConcurrentDictionary<int, LinkedList<RawDataHeader.RawDataHandler>>();
 
 
-        internal readonly SemaphoreSlim _receiveLock = new SemaphoreSlim(1, 1);
+        internal readonly SemaphoreSlim _receiveLock = new SemaphoreSlim(1);
 
         internal readonly ConcurrentDictionary<int, TaskCompletionSource<object>> _responseTasks =
             new ConcurrentDictionary<int, TaskCompletionSource<object>>();
 
-        internal readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
+        internal readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1);
 
         internal readonly ConcurrentQueue<TaskCompletionSource<object>> _sendQueue =
             new ConcurrentQueue<TaskCompletionSource<object>>();
@@ -197,7 +197,7 @@ namespace Ace.Networking
                 if (!_sendWorkerThreadRunning)
                 {
                     _sendWorkerThreadRunning = true;
-                    _sendWorkerThread = new Thread(SendWorker) {IsBackground = false};
+                    _sendWorkerThread = new Thread(SendWorker) { IsBackground = false };
                     _sendWorkerThread.Start();
                 }
             }
@@ -208,7 +208,7 @@ namespace Ace.Networking
 #if ReadAsync_Test
                 ReadAsync().ConfigureAwait(false);
 #else
-                _receiveWorkerThread = new Thread(ReadSync) {IsBackground = false};
+                _receiveWorkerThread = new Thread(ReadSync) { IsBackground = false };
                 _receiveWorkerThread.Start();
 #endif
             }
@@ -238,7 +238,7 @@ namespace Ace.Networking
             CancellationToken? token = null)
         {
             var res = await SendRequest(req, token).ConfigureAwait(false);
-            return (TResponse) res;
+            return (TResponse)res;
         }
 
 
@@ -253,7 +253,7 @@ namespace Ace.Networking
                 // ignored
             }
 
-            HandleRemoteDisconnect(SocketError.Shutdown, new SocketException((int) SocketError.Shutdown));
+            HandleRemoteDisconnect(SocketError.Shutdown, new SocketException((int)SocketError.Shutdown));
             //_closeEvent.Wait(5000);
             //Connected = false;
         }
@@ -339,9 +339,9 @@ namespace Ace.Networking
 
             token?.Register(t =>
             {
-                var task = (TaskCompletionSource<object>) t;
+                var task = (TaskCompletionSource<object>)t;
                 task.TrySetCanceled();
-                _responseTasks.TryRemove((int) task.Task.AsyncState, out _);
+                _responseTasks.TryRemove((int)task.Task.AsyncState, out _);
             }, tcs);
 
             return tcs.Task;
@@ -406,7 +406,7 @@ namespace Ace.Networking
                 if (o == null) return;
                 handled = true;
                 if (unboxedRequest.HasValue)
-                    EnqueueSendResponse(((TrackableHeader) header).RequestId, o);
+                    EnqueueSendResponse(((TrackableHeader)header).RequestId, o);
                 else
                     EnqueueSend(o);
             }
@@ -502,50 +502,56 @@ namespace Ace.Networking
 
         private void ReadSync()
         {
-            _receiveLock.Wait();
-            while (_receiveWorkerThreadRunning)
-                try
-                {
-                    var read = Stream.Read(_readBuffer.Buffer, _readBuffer.Offset, _readBuffer.Capacity);
-
-                    if (read == 0)
-                    {
-                        try
-                        {
-                            //_socket.Dispose();
-                            Close();
-                            //Close();
-                        }
-                        catch
-                        {
-                            // ignored
-                        }
-
-                        goto CLEANUP;
-                    }
-
-                    LastReceived = DateTime.Now;
-                    _readBuffer.BytesTransferred = read;
-                    _readBuffer.Offset = _readBuffer.BaseOffset;
-                    _readBuffer.Count = read;
-
+            try
+            {
+                _receiveLock.Wait();
+                while (_receiveWorkerThreadRunning)
                     try
                     {
-                        if (_readBuffer.Count > 0) _decoder.ProcessReadBytes(_readBuffer);
+                        var read = Stream.Read(_readBuffer.Buffer, _readBuffer.Offset, _readBuffer.Capacity);
+
+                        if (read == 0)
+                        {
+                            try
+                            {
+                                //_socket.Dispose();
+                                Close();
+                                //Close();
+                            }
+                            catch
+                            {
+                                // ignored
+                            }
+
+                            return;
+                        }
+
+                        LastReceived = DateTime.Now;
+                        _readBuffer.BytesTransferred = read;
+                        _readBuffer.Offset = _readBuffer.BaseOffset;
+                        _readBuffer.Count = read;
+
+                        try
+                        {
+                            if (_readBuffer.Count > 0) _decoder.ProcessReadBytes(_readBuffer);
+                        }
+                        catch (Exception exception)
+                        {
+                            HandleRemoteDisconnect(SocketError.SocketError, exception);
+                        }
                     }
-                    catch (Exception exception)
+                    catch (Exception e)
                     {
-                        HandleRemoteDisconnect(SocketError.SocketError, exception);
+                        HandleRemoteDisconnect(SocketError.SocketError, e);
                     }
-                }
-                catch (Exception e)
-                {
-                    HandleRemoteDisconnect(SocketError.SocketError, e);
-                }
 
-            CLEANUP:
 
-            _receiveLock.Release();
+
+            }
+            finally
+            {
+                _receiveLock.Release();
+            }
         }
 
         private async Task ReadAsync()
