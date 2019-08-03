@@ -502,50 +502,56 @@ namespace Ace.Networking
 
         private void ReadSync()
         {
-            _receiveLock.Wait();
-            while (_receiveWorkerThreadRunning)
-                try
-                {
-                    var read = Stream.Read(_readBuffer.Buffer, _readBuffer.Offset, _readBuffer.Capacity);
-
-                    if (read == 0)
-                    {
-                        try
-                        {
-                            //_socket.Dispose();
-                            Close();
-                            //Close();
-                        }
-                        catch
-                        {
-                            // ignored
-                        }
-
-                        goto CLEANUP;
-                    }
-
-                    LastReceived = DateTime.Now;
-                    _readBuffer.BytesTransferred = read;
-                    _readBuffer.Offset = _readBuffer.BaseOffset;
-                    _readBuffer.Count = read;
-
+            try
+            {
+                _receiveLock.Wait();
+                while (_receiveWorkerThreadRunning)
                     try
                     {
-                        if (_readBuffer.Count > 0) _decoder.ProcessReadBytes(_readBuffer);
+                        var read = Stream.Read(_readBuffer.Buffer, _readBuffer.Offset, _readBuffer.Capacity);
+
+                        if (read == 0)
+                        {
+                            try
+                            {
+                                //_socket.Dispose();
+                                Close();
+                                //Close();
+                            }
+                            catch
+                            {
+                                // ignored
+                            }
+
+                            return;
+                        }
+
+                        LastReceived = DateTime.Now;
+                        _readBuffer.BytesTransferred = read;
+                        _readBuffer.Offset = _readBuffer.BaseOffset;
+                        _readBuffer.Count = read;
+
+                        try
+                        {
+                            if (_readBuffer.Count > 0) _decoder.ProcessReadBytes(_readBuffer);
+                        }
+                        catch (Exception exception)
+                        {
+                            HandleRemoteDisconnect(SocketError.SocketError, exception);
+                        }
                     }
-                    catch (Exception exception)
+                    catch (Exception e)
                     {
-                        HandleRemoteDisconnect(SocketError.SocketError, exception);
+                        HandleRemoteDisconnect(SocketError.SocketError, e);
                     }
-                }
-                catch (Exception e)
-                {
-                    HandleRemoteDisconnect(SocketError.SocketError, e);
-                }
 
-            CLEANUP:
+            }
+            catch { }
+            finally
+            {
 
-            _receiveLock.Release();
+                _receiveLock.Release();
+            }
         }
 
         private async Task ReadAsync()
