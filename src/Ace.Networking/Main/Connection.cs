@@ -403,10 +403,15 @@ namespace Ace.Networking
             //[MethodImpl(MethodImplOptions.AggressiveInlining)]
             void SendResponse(object o)
             {
-                if (o == null) return;
+                if (o == null)
+                    return;
+
                 handled = true;
+
+                if (!Connected)
+                    return;
                 if (unboxedRequest.HasValue)
-                    EnqueueSendResponse(((TrackableHeader) header).RequestId, o);
+                    EnqueueSendResponse(((TrackableHeader)header).RequestId, o);
                 else
                     EnqueueSend(o);
             }
@@ -435,7 +440,7 @@ namespace Ace.Networking
                 // ignored
             }
 
-            if (!handled && unboxedRequest.HasValue)
+            if (!handled && unboxedRequest.HasValue && Connected)
                 EnqueueSendPacket(new TrackablePacket<object>(
                     new TrackableHeader(unboxedRequest.Value, PacketFlag.IsResponse | PacketFlag.NoContent), null));
 
