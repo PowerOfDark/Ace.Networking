@@ -15,6 +15,7 @@ using Ace.Networking.Memory;
 using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.Serializers;
 using Microsoft.CSharp.RuntimeBinder;
+using System.Threading;
 
 namespace Ace.Networking.Entanglement.ProxyImpl
 {
@@ -194,24 +195,24 @@ namespace Ace.Networking.Entanglement.ProxyImpl
         }
 
 
-        public void Execute(IRequestWrapper req)
+        private SemaphoreSlim _executeLock = new SemaphoreSlim(1);
+
+        public async Task ExecuteAsync(object state)
         {
-            var cmd = (ExecuteMethod)req.Request;
-
-            //find the best overload
-            var overload = _Descriptor.FindOverload(cmd);
-
-            lock (_Context)
+            await _executeLock.WaitAsync();
+            try
             {
+                var req = (IRequestWrapper)state;
+                var cmd = (ExecuteMethod)req.Request;
+                var overload = _Descriptor.FindOverload(cmd);
                 if (!_Context.All.ContainsClient(req.Connection))
                 {
-                    req.SendResponse(new ExecuteMethodResult
+                    await req.SendResponse(new ExecuteMethodResult
                     {
                         ExceptionAdapter = new RemoteExceptionAdapter("Unauthorized")
                     });
                     return;
                 }
-
                 _Context.Sender = req.Connection;
                 RemoteExceptionAdapter exception = null;
                 Task task = null;
@@ -239,18 +240,28 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                         m.Data = retObj;
                     }
 
-                    req.SendResponse(m);
+                    await req.SendResponse(m);
                     return;
                 }
 
 
+                try
+                {
+                    await task;
+                }
+                catch (Exception e)
+                {
+                    if (exception == null)
+                        exception = new RemoteExceptionAdapter("A remote async task failed", e);
+                }
+
                 // HUGE HACK WARNING
                 // we need to somehow operate on Task<T>, where T is unknown at compile time
                 // yet it is possible to always cast it to Task, then by casting it to a dynamic object access the result
-                if (exception != null || task.IsCompleted)
+
                 {
                     var res = new ExecuteMethodResult();
-                    if (exception != null || task.IsFaulted)
+                    if (exception != null)
                     {
                         res.Data = null;
                         res.ExceptionAdapter =
@@ -267,35 +278,23 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                         res.Data = ((dynamic)task).Result;
                     }
 
-                    req.SendResponse(res);
+                    await req.SendResponse(res);
                     return;
                 }
-
-                if (overload.RealReturnType == typeof(void))
-                    task.ContinueWith(t =>
-                    {
-                        RemoteExceptionAdapter ex = null;
-                        if (t.Exception != null) ex = new RemoteExceptionAdapter("A remote task failed", t.Exception);
-                        req.SendResponse(new ExecuteMethodResult { Data = null, ExceptionAdapter = ex });
-                    });
-                else
-                    task.ContinueWith(t =>
-                    {
-                        var exe = new ExecuteMethodResult();
-                        if (t.Exception != null)
-                        {
-                            exe.Data = null;
-                            exe.ExceptionAdapter = new RemoteExceptionAdapter("A remote task failed", t.Exception);
-                        }
-                        else
-                        {
-                            exe.ExceptionAdapter = null;
-                            exe.Data = ((dynamic)task).Result;
-                        }
-
-                        req.SendResponse(exe);
-                    });
             }
+            finally
+            {
+                _executeLock.Release();
+            }
+
+        }
+
+        public void Execute(IRequestWrapper req)
+        {
+            var cmd = (ExecuteMethod)req.Request;
+
+            //find the best overload
+            Task.Factory.StartNew(ExecuteAsync, req, CancellationToken.None, TaskCreationOptions.PreferFairness, TaskScheduler.Default);
         }
 
         public void SendState(IRequestWrapper request)
