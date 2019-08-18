@@ -15,8 +15,8 @@
                 lock (_lock)
                 {
                     if (_created) return _instance;
-                    _created = true;
                     _instance = new RecyclableMemoryStreamManager(2.0);
+                    _created = true;
                 }
 
                 return _instance;
