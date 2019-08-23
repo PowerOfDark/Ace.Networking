@@ -618,7 +618,6 @@ namespace Ace.Networking
             //_sendLock.Wait();
             _encoder.Prepare(msg);
             bool isComplete;
-            var err = false;
             do
             {
                 try
@@ -631,17 +630,13 @@ namespace Ace.Networking
                 catch (Exception ex)
                 {
                     HandleRemoteDisconnect(SocketError.SocketError, ex);
-                    err = true;
-                    break;
+                    throw;
                 }
             } while (!isComplete);
 
-            if (!err)
-            {
-                //_sendLock.Release();
-                sendCompletionSource?.TrySetResult(_payloadPending);
-                PayloadSent?.Invoke(this, _payloadPending, _payloadPendingType);
-            }
+            sendCompletionSource?.TrySetResult(_payloadPending);
+            PayloadSent?.Invoke(this, _payloadPending, _payloadPendingType);
+            
         }
 
         /// <summary>
