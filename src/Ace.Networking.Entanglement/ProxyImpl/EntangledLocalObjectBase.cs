@@ -17,6 +17,8 @@ namespace Ace.Networking.Entanglement.ProxyImpl
     {
         protected object _sync = new object();
 
+        public TimeSpan? DefaultExecutionTimeout { get; set; }
+
         public EntangledLocalObjectBase(IConnection host, Guid eid, InterfaceDescriptor desc)
         {
             Host = host;
@@ -72,6 +74,11 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                     token = ct;
             }
 
+            if (token == null && DefaultExecutionTimeout.HasValue)
+            {
+                token = DefaultExecutionTimeout.Value.GetCancellationToken();
+            }
+
             for (int i = 0; i < arg.Length; i++)
             {
                 if (descriptor.Parameters[i].IsDummy)
@@ -105,6 +112,11 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             {
                 if (arg.Last() is CancellationToken ct)
                     token = ct;
+            }
+
+            if(token == null && DefaultExecutionTimeout.HasValue)
+            {
+                token = DefaultExecutionTimeout.Value.GetCancellationToken();
             }
 
             for (int i = 0; i < arg.Length; i++)
