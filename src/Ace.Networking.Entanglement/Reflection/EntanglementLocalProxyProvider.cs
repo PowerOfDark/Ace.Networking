@@ -65,6 +65,8 @@ namespace Ace.Networking.Entanglement.Reflection
             type.FillBaseConstructors(elo);
 
             foreach (var methods in desc.Methods)
+            {
+                int methodOverloadId = 0;
                 foreach (var method in methods.Value)
                 {
                     var parameters = method.Method.GetParameters();
@@ -74,6 +76,7 @@ namespace Ace.Networking.Entanglement.Reflection
                     var i = m.GetILGenerator();
 
                     i.Emit(OpCodes.Ldarg_0);
+                    i.EmitLdci4(methodOverloadId++);
                     i.Emit(OpCodes.Ldstr, method.Method.Name);
 
                     //emit the object[] array to hold the parameters
@@ -108,7 +111,7 @@ namespace Ace.Networking.Entanglement.Reflection
                     //important: OVERRIDE THE INTERFACE [abstract] IMPLEMENTATION
                     type.DefineMethodOverride(m, method.Method);
                 }
-
+            }
             //implement getters
 
             var generatedProperties = new Queue<string>();

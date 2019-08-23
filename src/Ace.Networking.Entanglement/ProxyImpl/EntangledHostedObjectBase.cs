@@ -205,6 +205,16 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                 var req = (IRequestWrapper)state;
                 var cmd = (ExecuteMethod)req.Request;
                 var overload = _Descriptor.FindOverload(cmd);
+
+                if(overload == null)
+                {
+                    await req.SendResponse(new ExecuteMethodResult()
+                    {
+                        ExceptionAdapter = new RemoteExceptionAdapter("No overload could be found")
+                    });
+                    return;
+                }
+
                 if (!_Context.All.ContainsClient(req.Connection))
                 {
                     await req.SendResponse(new ExecuteMethodResult
@@ -213,6 +223,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                     });
                     return;
                 }
+                _Descriptor.FillInvocation(cmd, overload);
                 _Context.Sender = req.Connection;
                 RemoteExceptionAdapter exception = null;
                 Task task = null;

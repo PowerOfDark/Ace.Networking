@@ -9,6 +9,7 @@ using Ace.Networking.Entanglement.Structures;
 using Ace.Networking.Extensions;
 using Ace.Networking.Threading;
 using Ace.Networking.Memory;
+using System.Threading;
 
 namespace Ace.Networking.Entanglement.ProxyImpl
 {
@@ -59,30 +60,60 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             return exe;
         }
 
-        public async Task<T> ExecuteMethod<T>(string name, params object[] arg)
+        public async Task<T> ExecuteMethod<T>(int overloadId, string name, params object[] arg)
         {
+            var descriptor = _Descriptor.Methods[name][overloadId];
             var desc = GetExecuteMethodDescriptor(name, typeof(T), arg);
-            var res = await Host.SendRequest<ExecuteMethod, ExecuteMethodResult>(desc).ConfigureAwait(false);
+            CancellationToken? token = null;
+
+            if (descriptor.HasCancellationToken)
+            {
+                if (arg.Last() is CancellationToken ct)
+                    token = ct;
+            }
+
+            for (int i = 0; i < arg.Length; i++)
+            {
+                if (descriptor.Parameters[i].IsDummy)
+                    desc.Objects[i] = null;
+            }
+
+            var res = await Host.SendRequest<ExecuteMethod, ExecuteMethodResult>(desc, token).ConfigureAwait(false);
             if (res.ExceptionAdapter != null)
                 throw new RemoteException(res.ExceptionAdapter);
             if (res.Data == null) return default;
             return (T)res.Data;
         }
 
-        public T ExecuteMethodSync<T>(string name, params object[] arg)
+        public T ExecuteMethodSync<T>(int overloadId, string name, params object[] arg)
         {
-            return ExecuteMethod<T>(name, arg).GetAwaiter().GetResult();
+            return ExecuteMethod<T>(overloadId, name, arg).GetAwaiter().GetResult();
         }
 
-        public void ExecuteMethodVoidSync(string name, params object[] arg)
+        public void ExecuteMethodVoidSync(int overloadId, string name, params object[] arg)
         {
-            ExecuteMethodVoid(name, arg).GetAwaiter().GetResult();
+            ExecuteMethodVoid(overloadId, name, arg).GetAwaiter().GetResult();
         }
 
-        public async Task ExecuteMethodVoid(string name, params object[] arg)
+        public async Task ExecuteMethodVoid(int overloadId, string name, params object[] arg)
         {
+            var descriptor = _Descriptor.Methods[name][overloadId];
             var desc = GetExecuteMethodDescriptor(name, typeof(void), arg);
-            var res = await Host.SendRequest<ExecuteMethod, ExecuteMethodResult>(desc).ConfigureAwait(false);
+            CancellationToken? token = null;
+
+            if (descriptor.HasCancellationToken)
+            {
+                if (arg.Last() is CancellationToken ct)
+                    token = ct;
+            }
+
+            for (int i = 0; i < arg.Length; i++)
+            {
+                if (descriptor.Parameters[i].IsDummy)
+                    desc.Objects[i] = null;
+            }
+
+            var res = await Host.SendRequest<ExecuteMethod, ExecuteMethodResult>(desc, token).ConfigureAwait(false);
             if (res.ExceptionAdapter != null)
                 throw new RemoteException(res.ExceptionAdapter);
         }

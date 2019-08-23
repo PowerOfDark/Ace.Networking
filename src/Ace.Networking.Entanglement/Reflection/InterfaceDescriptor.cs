@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Threading;
 using System.Threading.Tasks;
 using Ace.Networking.Entanglement.Extensions;
 using Ace.Networking.Entanglement.Packets;
@@ -14,6 +15,7 @@ namespace Ace.Networking.Entanglement.Reflection
     public struct ParameterDescriptor
     {
         public bool IsOptional;
+        public bool IsDummy;
         public Type Type;
     }
 
@@ -23,6 +25,7 @@ namespace Ace.Networking.Entanglement.Reflection
         public ParameterDescriptor[] Parameters;
         public Type RealReturnType;
         public bool IsAsync;
+        public bool HasCancellationToken;
 
         public Func<object, object[], object> InvokerDelegate;
 
@@ -61,8 +64,8 @@ namespace Ace.Networking.Entanglement.Reflection
         public static ConcurrentDictionary<Type, InterfaceDescriptor> Cache =
             new ConcurrentDictionary<Type, InterfaceDescriptor>();
 
-        private readonly Dictionary<string, IReadOnlyCollection<MethodDescriptor>> _methods =
-            new Dictionary<string, IReadOnlyCollection<MethodDescriptor>>();
+        private readonly Dictionary<string, IReadOnlyList<MethodDescriptor>> _methods =
+            new Dictionary<string, IReadOnlyList<MethodDescriptor>>();
 
         private readonly Dictionary<string, PropertyDescriptor> _properties =
             new Dictionary<string, PropertyDescriptor>();
@@ -78,7 +81,7 @@ namespace Ace.Networking.Entanglement.Reflection
         public Type Type { get; }
 
         public IReadOnlyDictionary<string, PropertyDescriptor> Properties => _properties;
-        public IReadOnlyDictionary<string, IReadOnlyCollection<MethodDescriptor>> Methods => _methods;
+        public IReadOnlyDictionary<string, IReadOnlyList<MethodDescriptor>> Methods => _methods;
         public IReadOnlyDictionary<string, EventDescriptor> Events => _events;
 
         public override bool Equals(object obj)
@@ -192,15 +195,16 @@ namespace Ace.Networking.Entanglement.Reflection
 
                 var realRet = UnwrapTask(m.ReturnType);
 
-                LinkedList<MethodDescriptor> list;
+                List<MethodDescriptor> list;
 
                 if (!_methods.TryGetValue(m.Name, out var c))
-                    _methods[m.Name] = list = new LinkedList<MethodDescriptor>();
+                    _methods[m.Name] = list = new List<MethodDescriptor>();
                 else
-                    list = (LinkedList<MethodDescriptor>)c;
+                    list = (List<MethodDescriptor>)c;
 
-
-                list.AddLast(new MethodDescriptor
+                MethodDescriptor currentMethod;
+                
+                list.Add(currentMethod = new MethodDescriptor
                 {
                     Method = m,
                     Parameters =
@@ -209,6 +213,14 @@ namespace Ace.Networking.Entanglement.Reflection
                     RealReturnType = realRet ?? m.ReturnType,
                     IsAsync = realRet != null,
                 });
+                var par = currentMethod.Parameters;
+                var last = par.LastOrDefault();
+                if(par.Length > 0 && (last.Type == typeof(CancellationToken) || last.Type == typeof(CancellationToken?)))
+                {
+                    currentMethod.HasCancellationToken = true;
+                    par[par.Length - 1].IsDummy = true;
+                }
+
             }
 
             var flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.FlattenHierarchy;
@@ -317,7 +329,7 @@ namespace Ace.Networking.Entanglement.Reflection
                 {
                     var i = 0;
                     var err = false;
-                    for (; i < m.Parameters.Length && i < cmd.Objects?.Length; i++)
+                    for (; i < m.Parameters.Length; i++)
                     {
                         var type = cmd.Objects[i]?.GetType();
                         if (type != null && !m.Parameters[i].Type.IsAssignableFrom(type))
@@ -332,6 +344,18 @@ namespace Ace.Networking.Entanglement.Reflection
                 }
 
             return null;
+        }
+
+        public void FillInvocation(ExecuteMethod cmd, MethodDescriptor descriptor)
+        {
+            for(int i = 0; i < cmd.Objects.Length; i++)
+            {
+                var type = descriptor.Parameters[i].Type;
+                if (descriptor.Parameters[i].IsDummy || (type.GetTypeInfo().IsValueType && cmd.Objects[i] == null))
+                {
+                    cmd.Objects[i] = Activator.CreateInstance(type);
+                }
+            }
         }
     }
 }
