@@ -96,7 +96,7 @@ namespace Ace.Networking
 
         internal Connection(TcpClient client, ProtocolConfiguration configuration,
             IInternalServiceManager<IConnection> services = null, ISslStreamFactory sslFactory = null,
-            IConnectionData data = null, InternalPayloadDispatchHandler dispatcher = null) : this(
+            IConnectionData data = null, List<InternalPayloadDispatchHandler> dispatcher = null) : this(
             configuration.PayloadEncoder.Clone(), configuration.PayloadDecoder.Clone())
         {
             if (configuration == null)
@@ -112,7 +112,7 @@ namespace Ace.Networking
             _services = services; // ?? BasicServiceManager<IConnection>.Empty;
             _sslFactory = sslFactory;
             Data = data;
-            DispatchPayload = dispatcher;
+            DispatchPayload = dispatcher ?? new List<InternalPayloadDispatchHandler>(0);
         }
 
         public bool UseCustomOutcomingMessageQueue => CustomOutcomingMessageQueue != null;
@@ -136,7 +136,7 @@ namespace Ace.Networking
 
         public ISslCertificatePair SslCertificates { get; private set; }
 
-        public event InternalPayloadDispatchHandler DispatchPayload;
+        public List<InternalPayloadDispatchHandler> DispatchPayload { get; private set; }
 
         public IPayloadSerializer Serializer => _encoder?.Serializer ?? _decoder?.Serializer;
         public ITypeResolver TypeResolver => Serializer.TypeResolver;
@@ -357,12 +357,12 @@ namespace Ace.Networking
 
         public override int GetHashCode()
         {
-            return Guid.GetHashCode();
+            return (int)Identifier;
         }
 
         public override bool Equals(object obj)
         {
-            return obj is Connection c && c.Guid == Guid && c.Identifier == Identifier;
+            return obj is Connection c && c.Identifier == Identifier;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -431,9 +431,8 @@ namespace Ace.Networking
             try
             {
                 if (DispatchPayload != null)
-                    foreach (var handler in DispatchPayload.GetInvocationList())
-                        if (handler is InternalPayloadDispatchHandler h)
-                            handled |= h.Invoke(this, obj, type, SendResponse, unboxedRequest);
+                    foreach (var handler in DispatchPayload)
+                        handled |= handler.Invoke(this, obj, type, SendResponse, unboxedRequest);
             }
             catch
             {

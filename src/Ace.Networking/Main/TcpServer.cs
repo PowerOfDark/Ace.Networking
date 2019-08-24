@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -40,6 +41,7 @@ namespace Ace.Networking
 
             _timer = new Timer(Timer_Tick, null, 0, System.Threading.Timeout.Infinite);
             _services = services ?? ServicesManager<IServer>.Empty;
+            DispatchPayload = new List<Connection.InternalPayloadDispatchHandler>(0);
         }
 
         protected IConnectionBuilder ConnectionBuilder { get; }
@@ -89,7 +91,7 @@ namespace Ace.Networking
         public event ClientAcceptedHandler ClientAccepted;
         public event Connection.DisconnectHandler ClientDisconnected;
         public event GlobalPayloadHandler PayloadReceived;
-        public event Connection.InternalPayloadDispatchHandler DispatchPayload;
+        public List<Connection.InternalPayloadDispatchHandler> DispatchPayload { get; private set; }
 
         /// <summary>
         ///     Triggers after a connection has been idle for the specified TimeSpan (<see cref="ReceiveTimeout" />)
@@ -256,10 +258,10 @@ namespace Ace.Networking
             }
 
             if (DispatchPayload != null)
-                foreach (var @delegate in DispatchPayload.GetInvocationList())
+                foreach (var @delegate in DispatchPayload)
                     try
                     {
-                        var h = (Connection.InternalPayloadDispatchHandler) @delegate;
+                        var h = @delegate;
                         ret |= h(connection, payload, type, responseSender, requestId);
                     }
                     catch

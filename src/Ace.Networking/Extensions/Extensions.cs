@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
+using static Ace.Networking.Connection;
 
 namespace Ace.Networking.Extensions
 {
@@ -65,6 +66,24 @@ namespace Ace.Networking.Extensions
         public static CancellationToken GetCancellationToken(this TimeSpan ts)
         {
             return new CancellationTokenSource(ts).Token;
+        }
+
+        public static void Subscribe(this List<InternalPayloadDispatchHandler> list, InternalPayloadDispatchHandler handler)
+        {
+            lock (list)
+            {
+                if (list.Contains(handler))
+                    return;
+                list.Add(handler);
+            }
+        }
+
+        public static bool Unsubscribe(this List<InternalPayloadDispatchHandler> list, InternalPayloadDispatchHandler handler)
+        {
+            lock(list)
+            {
+                return list.Remove(handler);
+            }
         }
     }
 }

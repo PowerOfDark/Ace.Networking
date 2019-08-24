@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
+using Ace.Networking.Extensions;
 using Ace.Networking.MicroProtocol.SSL;
 using Ace.Networking.Serializers;
 using Ace.Networking.Services;
@@ -14,13 +16,14 @@ namespace Ace.Networking
     {
         private ProtocolConfiguration _config;
         private IConnectionData _data;
-        private Connection.InternalPayloadDispatchHandler _dispatcher;
+        private List<Connection.InternalPayloadDispatchHandler> _dispatcher;
         private IServicesBuilder<IConnection> _services;
         private ISslStreamFactory _sslFactory;
 
         public ConnectionBuilder(ProtocolConfiguration config = null)
         {
             _config = config ?? new ProtocolConfiguration();
+            _dispatcher = new List<Connection.InternalPayloadDispatchHandler>(0);
         }
 
         public IConnectionBuilder UseServices(IServicesBuilder<IConnection> services)
@@ -76,7 +79,7 @@ namespace Ace.Networking
 
         public IConnectionBuilder UseDispatcher(Connection.InternalPayloadDispatchHandler dispatcher)
         {
-            _dispatcher += dispatcher;
+            _dispatcher.Subscribe(dispatcher);
             return this;
         }
 

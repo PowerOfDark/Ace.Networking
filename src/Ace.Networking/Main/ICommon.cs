@@ -4,6 +4,7 @@ using Ace.Networking.MicroProtocol.Interfaces;
 using Ace.Networking.Serializers;
 using Ace.Networking.Services;
 using Ace.Networking.TypeResolvers;
+using System.Collections.Generic;
 
 namespace Ace.Networking
 {
@@ -13,6 +14,6 @@ namespace Ace.Networking
         IPayloadSerializer Serializer { get; }
         ITypeResolver TypeResolver { get; }
 
-        event Connection.InternalPayloadDispatchHandler DispatchPayload;
+        List<Connection.InternalPayloadDispatchHandler> DispatchPayload { get; }
     }
 }

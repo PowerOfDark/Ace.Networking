@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Ace.Networking.Extensions;
 using Ace.Networking.Handlers;
 using Ace.Networking.Serializers;
 using Ace.Networking.Services;
@@ -17,6 +18,7 @@ namespace Ace.Networking.Structures
         public ConnectionGroup(ICommon host)
         {
             Host = host;
+            DispatchPayload = new List<Connection.InternalPayloadDispatchHandler>(0);
         }
 
         public IReadOnlyCollection<IConnection> Clients => _clients;
@@ -24,7 +26,7 @@ namespace Ace.Networking.Structures
         public IServiceManager Services => Host.Services;
         public ITypeResolver TypeResolver => Host?.TypeResolver;
         public IPayloadSerializer Serializer => Host?.Serializer;
-        public event Connection.InternalPayloadDispatchHandler DispatchPayload;
+        public List<Connection.InternalPayloadDispatchHandler> DispatchPayload { get; private set; }
 
         public void AddClient(IConnection client)
         {
@@ -75,7 +77,7 @@ namespace Ace.Networking.Structures
 
         internal void Bind()
         {
-            Host.DispatchPayload += Host_DispatchPayload;
+            Host.DispatchPayload.Subscribe(Host_DispatchPayload);
             Host.ClientDisconnected += Host_ClientDisconnected;
         }
 
@@ -87,7 +89,7 @@ namespace Ace.Networking.Structures
 
         internal void Unbind()
         {
-            Host.DispatchPayload -= Host_DispatchPayload;
+            Host.DispatchPayload.Unsubscribe(Host_DispatchPayload);
             Host.ClientDisconnected -= Host_ClientDisconnected;
         }
 
@@ -109,11 +111,10 @@ namespace Ace.Networking.Structures
 
 
             if (DispatchPayload != null)
-                foreach (var handler in DispatchPayload.GetInvocationList())
+                foreach (var handler in DispatchPayload)
                     try
                     {
-                        if (handler is Connection.InternalPayloadDispatchHandler h)
-                            ret |= h.Invoke(connection, payload, type, responseSender, requestId);
+                        ret |= handler.Invoke(connection, payload, type, responseSender, requestId);
                     }
                     catch
                     {
