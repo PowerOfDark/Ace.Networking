@@ -79,10 +79,13 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                 token = DefaultExecutionTimeout.Value.GetCancellationToken();
             }
 
-            for (int i = 0; i < arg.Length; i++)
+            if (arg != null)
             {
-                if (descriptor.Parameters[i].IsDummy)
-                    desc.Objects[i] = null;
+                for (int i = 0; i < arg.Length; i++)
+                {
+                    if (descriptor.Parameters[i].IsDummy)
+                        desc.Objects[i] = null;
+                }
             }
 
             var res = await Host.SendRequest<ExecuteMethod, ExecuteMethodResult>(desc, token).ConfigureAwait(false);
@@ -119,10 +122,13 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                 token = DefaultExecutionTimeout.Value.GetCancellationToken();
             }
 
-            for (int i = 0; i < arg.Length; i++)
+            if (arg != null)
             {
-                if (descriptor.Parameters[i].IsDummy)
-                    desc.Objects[i] = null;
+                for (int i = 0; i < arg.Length; i++)
+                {
+                    if (descriptor.Parameters[i].IsDummy)
+                        desc.Objects[i] = null;
+                }
             }
 
             var res = await Host.SendRequest<ExecuteMethod, ExecuteMethodResult>(desc, token).ConfigureAwait(false);
