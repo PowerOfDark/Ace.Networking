@@ -164,6 +164,7 @@ namespace Ace.Networking
         public void Initialize()
         {
             if (Connected) return;
+            Socket.NoDelay = true;
             _stream = new NetworkStream(Socket);
             if (SslMode != SslMode.None)
             {
@@ -624,6 +625,7 @@ namespace Ace.Networking
                     _encoder.Send(_writeBuffer);
                     /* Important: this.Stream returns the SSL or basic stream */
                     Stream.Write(_writeBuffer.Buffer, _writeBuffer.Offset, _writeBuffer.Count);
+                    Stream.Flush();
                     isComplete = _encoder.OnSendCompleted(_writeBuffer.Count);
                 }
                 catch (Exception ex)
