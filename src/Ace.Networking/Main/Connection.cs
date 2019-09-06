@@ -198,7 +198,7 @@ namespace Ace.Networking
                 if (!_sendWorkerThreadRunning)
                 {
                     _sendWorkerThreadRunning = true;
-                    _sendWorkerThread = new Thread(SendWorker) {IsBackground = true};
+                    _sendWorkerThread = new Thread(SendWorker) { IsBackground = true };
                     _sendWorkerThread.Start();
                 }
             }
@@ -209,7 +209,7 @@ namespace Ace.Networking
 #if ReadAsync_Test
                 ReadAsync().ConfigureAwait(false);
 #else
-                _receiveWorkerThread = new Thread(ReadSync) {IsBackground = true};
+                _receiveWorkerThread = new Thread(ReadSync) { IsBackground = true };
                 _receiveWorkerThread.Start();
 #endif
             }
@@ -239,7 +239,7 @@ namespace Ace.Networking
             CancellationToken? token = null)
         {
             var res = await SendRequest(req, token).ConfigureAwait(false);
-            return (TResponse) res;
+            return (TResponse)res;
         }
 
 
@@ -254,7 +254,7 @@ namespace Ace.Networking
                 // ignored
             }
 
-            HandleRemoteDisconnect(SocketError.Shutdown, new SocketException((int) SocketError.Shutdown));
+            HandleRemoteDisconnect(SocketError.Shutdown, new SocketException((int)SocketError.Shutdown));
             //_closeEvent.Wait(5000);
             //Connected = false;
         }
@@ -340,9 +340,9 @@ namespace Ace.Networking
 
             token?.Register(t =>
             {
-                var task = (TaskCompletionSource<object>) t;
+                var task = (TaskCompletionSource<object>)t;
                 task.TrySetCanceled();
-                _responseTasks.TryRemove((int) task.Task.AsyncState, out _);
+                _responseTasks.TryRemove((int)task.Task.AsyncState, out _);
             }, tcs);
 
             return tcs.Task;
@@ -499,7 +499,7 @@ namespace Ace.Networking
                 }
                 else
                 {
-                    _sendWorkerWaitHandle.WaitOne();
+                    _sendWorkerWaitHandle.WaitOne(100);
                 }
 
             _sendWorkerThreadRunning = false;
@@ -510,7 +510,8 @@ namespace Ace.Networking
             try
             {
                 _receiveLock.Wait();
-                while (_receiveWorkerThreadRunning)
+                _receiveWorkerThreadRunning = true;
+                while (Connected)
                     try
                     {
                         var read = Stream.Read(_readBuffer.Buffer, _readBuffer.Offset, _readBuffer.Capacity);
@@ -551,18 +552,18 @@ namespace Ace.Networking
                     }
 
             }
-            catch { }
             finally
             {
-
+                _receiveWorkerThreadRunning = true;
                 _receiveLock.Release();
             }
         }
 
         private async Task ReadAsync()
         {
+            _receiveWorkerThreadRunning = true;
             await _receiveLock.WaitAsync().ConfigureAwait(false);
-            while (_receiveWorkerThreadRunning)
+            while (Connected)
                 try
                 {
                     var read = await Stream.ReadAsync(_readBuffer.Buffer, _readBuffer.Offset, _readBuffer.Capacity)
@@ -604,14 +605,14 @@ namespace Ace.Networking
                 }
 
             CLEANUP:
-
+            _receiveWorkerThreadRunning = false;
             _receiveLock.Release();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SendSync(IPreparedPacket msg, TaskCompletionSource<object> sendCompletionSource)
         {
-            if (Socket == null || !Connected) throw new SocketException((int) SocketError.NotInitialized);
+            if (Socket == null || !Connected) throw new SocketException((int)SocketError.NotInitialized);
 
             _payloadPending = msg.GetPayload();
             _payloadPendingType = _payloadPending?.GetType() ?? typeof(object);
@@ -625,7 +626,7 @@ namespace Ace.Networking
                     _encoder.Send(_writeBuffer);
                     /* Important: this.Stream returns the SSL or basic stream */
                     Stream.Write(_writeBuffer.Buffer, _writeBuffer.Offset, _writeBuffer.Count);
-                    Stream.Flush();
+                    // doesn't do anything -- Stream.Flush();
                     isComplete = _encoder.OnSendCompleted(_writeBuffer.Count);
                 }
                 catch (Exception ex)
@@ -637,7 +638,7 @@ namespace Ace.Networking
 
             sendCompletionSource?.TrySetResult(_payloadPending);
             PayloadSent?.Invoke(this, _payloadPending, _payloadPendingType);
-            
+
         }
 
         /// <summary>
@@ -791,7 +792,7 @@ namespace Ace.Networking
 
             Connected = false;
             if (_sendLock.CurrentCount == 0) _sendLock.Release();
-            if (_closeEvent.CurrentCount == 1) _closeEvent.Wait();
+            //if (_closeEvent.CurrentCount == 1) _closeEvent.Wait();
             _sendWorkerThreadRunning = false;
             _receiveWorkerThreadRunning = false;
         }
