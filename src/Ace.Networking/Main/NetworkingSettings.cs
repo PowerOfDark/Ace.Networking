@@ -19,7 +19,7 @@ namespace Ace.Networking
             return Guid.Parse(PrimitiveGuid + (i.ToString("D12")));
         }
 
-        public static readonly Type[] Primitives =
+        public static readonly HashSet<Type> Primitives = new HashSet<Type>()
         {
             typeof(object), typeof(Stream), typeof(byte), typeof(int), typeof(uint), typeof(long), typeof(ulong),
             typeof(bool), typeof(sbyte), typeof(DateTime), typeof(void), typeof(short), typeof(ushort), typeof(double),
