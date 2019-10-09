@@ -3,7 +3,6 @@ using ProtoBuf;
 
 namespace Ace.Networking.MicroProtocol.Enums
 {
-    [ProtoContract]
     [Flags]
     public enum PacketFlag
     {

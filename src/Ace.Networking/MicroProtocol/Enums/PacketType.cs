@@ -2,7 +2,6 @@
 
 namespace Ace.Networking.MicroProtocol.Enums
 {
-    [ProtoContract]
     public enum PacketType
     {
         Unknown = 0,
