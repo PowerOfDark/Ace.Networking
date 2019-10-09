@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using Ace.Networking.Structures;
 using Ace.Networking.TypeResolvers;
 
@@ -25,7 +26,8 @@ namespace Ace.Networking
             typeof(object), typeof(Stream), typeof(byte), typeof(int), typeof(uint), typeof(long), typeof(ulong),
             typeof(bool), typeof(sbyte), typeof(DateTime), typeof(void), typeof(short), typeof(ushort), typeof(double),
             typeof(float), typeof(List<>), typeof(Dictionary<,>), typeof(Guid), typeof(System.IntPtr), typeof(System.TimeSpan), typeof(DateTimeOffset),
-            typeof(char), typeof(HashSet<>), typeof(LinkedList<>), typeof(string), typeof(PropertyChangedEventArgs), typeof(EventArgs), typeof(EventHandler<>)
+            typeof(char), typeof(HashSet<>), typeof(LinkedList<>), typeof(string), typeof(PropertyChangedEventArgs), typeof(EventArgs), typeof(EventHandler<>), typeof(CancellationToken),
+            typeof(Nullable<>),
         };
 
         private static readonly List<Assembly> _packetAssemblies = new List<Assembly>();
