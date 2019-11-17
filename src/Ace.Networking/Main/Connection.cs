@@ -113,6 +113,7 @@ namespace Ace.Networking
             _sslFactory = sslFactory;
             Data = data;
             DispatchPayload = dispatcher ?? new List<InternalPayloadDispatchHandler>(0);
+            _readAsync = configuration.ReadAsync;
         }
 
         public bool UseCustomOutcomingMessageQueue => CustomOutcomingMessageQueue != null;
@@ -123,6 +124,7 @@ namespace Ace.Networking
         public Socket Socket => Client?.Client;
         public Stream Stream => _sslStream ?? _stream;
         public SslMode SslMode { get; }
+        private bool _readAsync;
 
         public int MessagesQueued
         {
@@ -206,12 +208,15 @@ namespace Ace.Networking
             if (!_receiveWorkerThreadRunning)
             {
                 _receiveWorkerThreadRunning = true;
-#if ReadAsync_Test
-                ReadAsync().ConfigureAwait(false);
-#else
-                _receiveWorkerThread = new Thread(ReadSync) { IsBackground = true };
-                _receiveWorkerThread.Start();
-#endif
+                if (_readAsync)
+                {
+                    ReadAsync().ConfigureAwait(false);
+                }
+                else
+                {
+                    _receiveWorkerThread = new Thread(ReadSync) { IsBackground = true };
+                    _receiveWorkerThread.Start();
+                }
             }
         }
 

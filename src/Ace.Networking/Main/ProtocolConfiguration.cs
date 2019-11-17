@@ -26,13 +26,14 @@ namespace Ace.Networking
 
         public ProtocolConfiguration(IPayloadEncoder encoder, IPayloadDecoder decoder,
             ThreadedQueueProcessor<SendMessageQueueItem> customOutQueue = null,
-            ThreadedQueueProcessor<ReceiveMessageQueueItem> customInQueue = null)
+            ThreadedQueueProcessor<ReceiveMessageQueueItem> customInQueue = null, bool readAsync = false)
         {
             PayloadEncoder = encoder;
             PayloadDecoder = decoder;
             Serializer = encoder.Serializer;
             CustomOutcomingMessageQueue = customOutQueue;
             CustomIncomingMessageQueue = customInQueue;
+            ReadAsync = readAsync;
             Initialize();
         }
 
@@ -56,6 +57,8 @@ namespace Ace.Networking
 
         public ThreadedQueueProcessor<SendMessageQueueItem> CustomOutcomingMessageQueue { get; protected set; }
         public ThreadedQueueProcessor<ReceiveMessageQueueItem> CustomIncomingMessageQueue { get; protected set; }
+
+        public bool ReadAsync { get; protected set; }
 
         protected virtual void Initialize()
         {
