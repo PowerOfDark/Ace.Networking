@@ -265,13 +265,12 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
                 try
                 {
-                    if(exception != null)
+                    if(exception == null)
                         await task;
                 }
                 catch (Exception e)
                 {
-                    if (exception == null)
-                        exception = new RemoteExceptionAdapter("A remote async task failed", e);
+                    exception = new RemoteExceptionAdapter("A remote async task failed", e);
                 }
 
                 // HUGE HACK WARNING
