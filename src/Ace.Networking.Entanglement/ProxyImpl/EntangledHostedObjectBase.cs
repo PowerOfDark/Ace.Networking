@@ -206,23 +206,30 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                 var cmd = (ExecuteMethod)req.Request;
                 var overload = _Descriptor.FindOverload(cmd);
 
+                ExecuteMethodResult result = null;
+
                 if(overload == null)
                 {
-                    await req.SendResponse(new ExecuteMethodResult()
+                    result = new ExecuteMethodResult()
                     {
                         ExceptionAdapter = new RemoteExceptionAdapter("No overload could be found")
-                    });
+                    };
+                }
+                
+                if (!_Context.All.ContainsClient(req.Connection))
+                {
+                    result = new ExecuteMethodResult()
+                    {
+                        ExceptionAdapter = new RemoteExceptionAdapter("Unauthorized")
+                    };
+                }
+
+                if(result != null)
+                {
+                    req.TrySendResponse(result, out _);
                     return;
                 }
 
-                if (!_Context.All.ContainsClient(req.Connection))
-                {
-                    await req.SendResponse(new ExecuteMethodResult
-                    {
-                        ExceptionAdapter = new RemoteExceptionAdapter("Unauthorized")
-                    });
-                    return;
-                }
                 _Descriptor.FillInvocation(cmd, overload);
                 _Context.Sender = req.Connection;
                 RemoteExceptionAdapter exception = null;
@@ -251,7 +258,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                         m.Data = retObj;
                     }
 
-                    await req.SendResponse(m);
+                    req.TrySendResponse(m, out var responseTask);
                     return;
                 }
 
@@ -290,7 +297,7 @@ namespace Ace.Networking.Entanglement.ProxyImpl
                         res.Data = ((dynamic)task).Result;
                     }
 
-                    await req.SendResponse(res);
+                    req.TrySendResponse(res, out _);
                     return;
                 }
             }
@@ -311,9 +318,9 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
         public void SendState(IRequestWrapper request)
         {
-            request.SendResponse(_Context.All.ContainsClient(request.Connection)
+            request.TrySendResponse(_Context.All.ContainsClient(request.Connection)
                 ? GetAllProperties(request.Connection)
-                : new UpdateProperties() { Eid = _Eid, Updates = null });
+                : new UpdateProperties() { Eid = _Eid, Updates = null }, out _);
         }
 
         public void AddClient(IConnection client)

@@ -264,7 +264,7 @@ namespace Ace.Networking.Entanglement
                 }
             }
 
-            request.SendResponse(new EntangleResult {Eid = eid});
+            request.TrySendResponse(new EntangleResult {Eid = eid}, out _);
 
             return true;
         }
