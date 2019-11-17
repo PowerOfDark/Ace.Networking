@@ -258,7 +258,8 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
                 try
                 {
-                    await task;
+                    if(exception != null)
+                        await task;
                 }
                 catch (Exception e)
                 {
