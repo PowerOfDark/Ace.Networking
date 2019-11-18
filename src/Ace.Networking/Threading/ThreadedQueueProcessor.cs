@@ -33,6 +33,8 @@ namespace Ace.Networking.Threading
         protected long LastWorkTicks;
         protected long MonitorTick;
         protected ConcurrentQueue<ThreadedQueueItem<TItem>>[] SendQueues;
+        private int _queueSize;
+
 
         protected volatile int ThreadCount;
 
@@ -72,6 +74,7 @@ namespace Ace.Networking.Threading
                 SendQueues[i] = new ConcurrentQueue<ThreadedQueueItem<TItem>>();
                 ThreadList.Add(null);
             }
+            _queueSize = SendQueues.Length;
 
             TrySpawnNewThreads(Parameters.MinThreads);
 
@@ -131,7 +134,7 @@ namespace Ace.Networking.Threading
                 MonitorTick - LastBoostTick >= Parameters.BoostCooldownTicks)
             {
                 target += LastBoostSize += 1;
-                BoostPeak = cc - Parameters.BoostBarrier;
+                //BoostPeak = cc - Parameters.BoostBarrier;
             }
 
             if (target < threadsRequired) target = threadsRequired;
@@ -171,7 +174,7 @@ namespace Ace.Networking.Threading
             }
             else
             {
-                if (currentThreadCount > threadsRequired)
+                if (Parameters.BoostBarrier > cc)
                 {
                     LastBoostSize = 0;
                     if (MonitorTick - LastKillTick >= Parameters.ThreadKillCooldownTicks)
@@ -225,7 +228,7 @@ namespace Ace.Networking.Threading
                             && MonitorTick - LastStepdownBarrierTick >= Parameters.StepdownBarrierTicks)
                         {
                             LastStepdownBarrierTick = MonitorTick;
-                            BoostPeak = Math.Max(0, BoostPeak - Parameters.BoostBarrier);
+                            //BoostPeak = Math.Max(0, BoostPeak - Parameters.BoostBarrier);
                         }
                     }
                 }

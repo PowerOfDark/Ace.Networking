@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.27428.2043
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29123.88
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Ace.Networking", "src\Ace.Networking\Ace.Networking.csproj", "{56090928-A113-4B05-BB50-7CB135B578CA}"
 EndProject
@@ -13,7 +13,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Entanglement.Common", "..\A
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Ace.Networking.Tests", "tests\Ace.Networking.Tests\Ace.Networking.Tests.csproj", "{3261C218-E05F-4BDF-AB6C-C78ECF09DA60}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ace.Networking.Entanglement", "src\Ace.Networking.Entanglement\Ace.Networking.Entanglement.csproj", "{D90953FF-5173-4C29-8405-2638425E404D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Ace.Networking.Entanglement", "src\Ace.Networking.Entanglement\Ace.Networking.Entanglement.csproj", "{D90953FF-5173-4C29-8405-2638425E404D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ace.Networking.ThreadBenchmark", "tests\Ace.Networking.ThreadBenchmark\Ace.Networking.ThreadBenchmark\Ace.Networking.ThreadBenchmark.csproj", "{65AFD737-795D-4A5A-B6D8-27B61CD862F7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -45,6 +47,10 @@ Global
 		{D90953FF-5173-4C29-8405-2638425E404D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D90953FF-5173-4C29-8405-2638425E404D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D90953FF-5173-4C29-8405-2638425E404D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{65AFD737-795D-4A5A-B6D8-27B61CD862F7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{65AFD737-795D-4A5A-B6D8-27B61CD862F7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{65AFD737-795D-4A5A-B6D8-27B61CD862F7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{65AFD737-795D-4A5A-B6D8-27B61CD862F7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
