@@ -48,18 +48,10 @@ namespace Ace.Networking
         internal readonly ConcurrentDictionary<int, LinkedList<RawDataHeader.RawDataHandler>> _rawDataHandlers =
             new ConcurrentDictionary<int, LinkedList<RawDataHeader.RawDataHandler>>();
 
-
-        internal readonly SemaphoreSlim _receiveLock = new SemaphoreSlim(1, 1);
-
         internal readonly ConcurrentDictionary<int, TaskCompletionSource<object>> _responseTasks =
             new ConcurrentDictionary<int, TaskCompletionSource<object>>();
 
-        internal readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
 
-        internal readonly ConcurrentQueue<TaskCompletionSource<object>> _sendQueue =
-            new ConcurrentQueue<TaskCompletionSource<object>>();
-
-        private readonly AutoResetEvent _sendWorkerWaitHandle = new AutoResetEvent(false);
 
         private readonly IInternalServiceManager<IConnection> _services;
         private readonly ISslStreamFactory _sslFactory;
@@ -72,8 +64,7 @@ namespace Ace.Networking
         private volatile bool _receiveWorkerThreadRunning;
 
 
-        private Thread _sendWorkerThread;
-        private volatile bool _sendWorkerThreadRunning;
+        private SemaphoreQueue _sendLock;
 
         private Stream _sslStream;
 
@@ -126,15 +117,6 @@ namespace Ace.Networking
         public SslMode SslMode { get; }
         private bool _readAsync;
 
-        public int MessagesQueued
-        {
-            get
-            {
-                if (UseCustomOutcomingMessageQueue)
-                    throw new NotSupportedException("Connection-binding in custom queue is not supported");
-                return _sendQueue.Count;
-            }
-        }
 
         public ISslCertificatePair SslCertificates { get; private set; }
 
@@ -197,12 +179,7 @@ namespace Ace.Networking
             }
             else
             {
-                if (!_sendWorkerThreadRunning)
-                {
-                    _sendWorkerThreadRunning = true;
-                    _sendWorkerThread = new Thread(SendWorker) { IsBackground = true };
-                    _sendWorkerThread.Start();
-                }
+                _sendLock = new SemaphoreQueue(1, 1);
             }
 
             if (!_receiveWorkerThreadRunning)
@@ -210,7 +187,7 @@ namespace Ace.Networking
                 _receiveWorkerThreadRunning = true;
                 if (_readAsync)
                 {
-                    ReadAsync().ConfigureAwait(false);
+                    Task.Run(ReadAsync);
                 }
                 else
                 {
@@ -446,8 +423,10 @@ namespace Ace.Networking
             }
 
             if (!handled && unboxedRequest.HasValue && Connected)
-                EnqueueSendPacket(new TrackablePacket<object>(
+            {
+                var _ = EnqueueSendPacket(new TrackablePacket<object>(
                     new TrackableHeader(unboxedRequest.Value, PacketFlag.IsResponse | PacketFlag.NoContent), null));
+            }
 
             //TODO: Inconsistencies
             // Order:
@@ -485,36 +464,11 @@ namespace Ace.Networking
             return null;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SendWorker()
-        {
-            _sendWorkerThreadRunning = true;
-            while (Connected)
-                if (_sendQueue.Count > 0)
-                {
-                    if (!_sendQueue.TryDequeue(out var tcs)) continue;
-                    try
-                    {
-                        PushSendSync(tcs);
-                    }
-                    catch (Exception e)
-                    {
-                        tcs.TrySetException(e);
-                    }
-                }
-                else
-                {
-                    _sendWorkerWaitHandle.WaitOne(100);
-                }
-
-            _sendWorkerThreadRunning = false;
-        }
 
         private void ReadSync()
         {
             try
             {
-                _receiveLock.Wait();
                 _receiveWorkerThreadRunning = true;
                 while (Connected)
                     try
@@ -560,14 +514,12 @@ namespace Ace.Networking
             finally
             {
                 _receiveWorkerThreadRunning = true;
-                _receiveLock.Release();
             }
         }
 
         private async Task ReadAsync()
         {
             _receiveWorkerThreadRunning = true;
-            await _receiveLock.WaitAsync().ConfigureAwait(false);
             while (Connected)
                 try
                 {
@@ -611,17 +563,15 @@ namespace Ace.Networking
 
             CLEANUP:
             _receiveWorkerThreadRunning = false;
-            _receiveLock.Release();
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SendSync(IPreparedPacket msg, TaskCompletionSource<object> sendCompletionSource)
         {
             if (Socket == null || !Connected) throw new SocketException((int)SocketError.NotInitialized);
 
             _payloadPending = msg.GetPayload();
             _payloadPendingType = _payloadPending?.GetType() ?? typeof(object);
-            //_sendLock.Wait();
+
             _encoder.Prepare(msg);
             bool isComplete;
             do
@@ -643,7 +593,35 @@ namespace Ace.Networking
 
             sendCompletionSource?.TrySetResult(_payloadPending);
             PayloadSent?.Invoke(this, _payloadPending, _payloadPendingType);
+        }
 
+        private async Task SendAsync(IPreparedPacket msg)
+        {
+            if (Socket == null || !Connected) throw new SocketException((int)SocketError.NotInitialized);
+
+            _payloadPending = msg.GetPayload();
+            _payloadPendingType = _payloadPending?.GetType() ?? typeof(object);
+
+            _encoder.Prepare(msg);
+            bool isComplete;
+            do
+            {
+                try
+                {
+                    _encoder.Send(_writeBuffer);
+                    /* Important: this.Stream returns the SSL or basic stream */
+                    await Stream.WriteAsync(_writeBuffer.Buffer, _writeBuffer.Offset, _writeBuffer.Count).ConfigureAwait(false);
+                    // doesn't do anything -- Stream.Flush();
+                    isComplete = _encoder.OnSendCompleted(_writeBuffer.Count);
+                }
+                catch (Exception ex)
+                {
+                    HandleRemoteDisconnect(SocketError.SocketError, ex);
+                    throw;
+                }
+            } while (!isComplete);
+
+            PayloadSent?.Invoke(this, _payloadPending, _payloadPendingType);
         }
 
         /// <summary>
@@ -658,21 +636,22 @@ namespace Ace.Networking
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal Task EnqueueSendPacket(IPreparedPacket packet)
+        internal async Task EnqueueSendPacket(IPreparedPacket packet)
         {
             if (!Connected) throw new InvalidOperationException("The socket had been closed");
-            var tcs = new TaskCompletionSource<object>(packet, TaskCreationOptions.RunContinuationsAsynchronously);
+            
             if (UseCustomOutcomingMessageQueue)
             {
+                var tcs = new TaskCompletionSource<object>(packet, TaskCreationOptions.RunContinuationsAsynchronously);
                 CustomOutcomingMessageQueue.Enqueue(new SendMessageQueueItem(this, tcs), GetHashCode());
+                await tcs.Task;
             }
             else
             {
-                _sendQueue.Enqueue(tcs);
-                _sendWorkerWaitHandle.Set();
+                await _sendLock.WaitAsync();
+                await SendAsync(packet);
             }
 
-            return tcs.Task;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -739,10 +718,9 @@ namespace Ace.Networking
                 // ignored
             }
 
-            _receiveWorkerThreadRunning = _sendWorkerThreadRunning = false;
+            _receiveWorkerThreadRunning = false;
 
             ClearHandlers(exception);
-            _sendWorkerWaitHandle?.Set();
             OnDisconnected();
             ClientDisconnected?.Invoke(this, exception);
 
@@ -772,9 +750,6 @@ namespace Ace.Networking
             _rawDataHandlers.Clear();
 
             RemoveAllHandlers();
-
-            while (_sendQueue.TryDequeue(out var s))
-                s.TrySetException(exception);
         }
 
         /// <summary>
@@ -796,9 +771,6 @@ namespace Ace.Networking
             Data?.Clear();
 
             Connected = false;
-            if (_sendLock.CurrentCount == 0) _sendLock.Release();
-            //if (_closeEvent.CurrentCount == 1) _closeEvent.Wait();
-            _sendWorkerThreadRunning = false;
             _receiveWorkerThreadRunning = false;
         }
 
