@@ -649,7 +649,14 @@ namespace Ace.Networking
             else
             {
                 await _sendLock.WaitAsync();
-                await SendAsync(packet);
+                try
+                {
+                    await SendAsync(packet);
+                }
+                finally
+                {
+                    _sendLock.Release();
+                }
             }
 
         }

@@ -27,6 +27,8 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             return true;
         }
 
+        public virtual bool ShouldSynchronizeMethods => true;
+
         public class InternalPropertyData
         {
             public bool IsPushed { get; set; }
@@ -199,7 +201,11 @@ namespace Ace.Networking.Entanglement.ProxyImpl
 
         public async Task ExecuteAsync(object state)
         {
-            await _executeLock.WaitAsync();
+            var sync = ShouldSynchronizeMethods;
+
+            if(sync)
+                await _executeLock.WaitAsync();
+
             try
             {
                 var req = (IRequestWrapper)state;
@@ -302,7 +308,8 @@ namespace Ace.Networking.Entanglement.ProxyImpl
             }
             finally
             {
-                _executeLock.Release();
+                if(sync)
+                    _executeLock.Release();
             }
 
         }
